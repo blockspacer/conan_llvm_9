@@ -4,13 +4,13 @@ from conans.tools import Version
 from conans.errors import ConanInvalidConfiguration
 from conans.model.version import Version
 
-class LLVMToolsConan(ConanFile):
-    name = "llvm_tools"
+class LLVM9Conan(ConanFile):
+    name = "llvm_9"
 
     version = "master"
     # TODO: llvmorg-9.0.1
-    llvm_version = "release/10.x"
-    iwyu_version = "clang_10"
+    llvm_version = "llvmorg-9.0.1"
+    iwyu_version = "clang_9.0"
 
     description = "conan package for LLVM TOOLS"
     topics = ("c++", "conan", "clang", "include-what-you-use", "llvm", "iwyu")
@@ -19,7 +19,7 @@ class LLVMToolsConan(ConanFile):
     #license = "Apache-2.0" # TODO
 
     # Constrains build_type inside a recipe to Release!
-    settings = {"os", "build_type", "compiler", "arch"}
+    settings = "os_build", "build_type", "arch_build", "compiler", "arch"
 
     options = {
         # hack (forcing -m64)
@@ -39,7 +39,7 @@ class LLVMToolsConan(ConanFile):
     default_options = {
         "force_x86_64": True,
         "link_ltinfo": False,
-        "include_what_you_use": True,
+        "include_what_you_use": False,
         "enable_msan": False,
         "enable_tsan": False,
         "enable_ubsan": False,
@@ -50,7 +50,7 @@ class LLVMToolsConan(ConanFile):
 
     exports_sources = ["LICENSE", "README.md", "include/*", "src/*",
                        "cmake/*", "CMakeLists.txt", "tests/*", "benchmarks/*",
-                       "scripts/*"]
+                       "scripts/*", "patches/*"]
 
     generators = 'cmake_find_package', "cmake", "cmake_paths"
 
@@ -177,11 +177,7 @@ class LLVMToolsConan(ConanFile):
         self.run('git clone -b {} --progress --depth 100 --recursive --recurse-submodules {} {}'.format(self.llvm_version, self.llvm_repo_url, self._llvm_source_subfolder))
 
         # IWYU
-        if self.options.include_what_you_use \
-            and not self.options.enable_msan \
-            and not self.options.enable_tsan \
-            and not self.options.enable_ubsan \
-            and not self.options.enable_asan:
+        if self.options.include_what_you_use:
             self.run('git clone -b {} --progress --depth 100 --recursive --recurse-submodules {} {}'.format(self.iwyu_version, self.iwyu_repo_url, self._iwyu_source_subfolder))
 
     def _configure_cmake(self, llvm_projects, llvm_runtimes, llvm_sanitizer=""):
@@ -189,6 +185,14 @@ class LLVMToolsConan(ConanFile):
 
         llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
         self.output.info('llvm_src_dir is {}'.format(llvm_src_dir))
+
+        compiler_rt_src_dir = os.path.join(self._llvm_source_subfolder, "compiler-rt")
+        self.output.info('compiler_rt_src_dir is {}'.format(compiler_rt_src_dir))
+
+        for patch in os.listdir(os.path.join(self.source_folder, "patches")):
+            patchpath = os.path.join(self.source_folder, "patches", patch)
+            self.output.info('patch is {}'.format(patchpath))
+            tools.patch(base_path=compiler_rt_src_dir, patch_file=patchpath)
 
         cmake = CMake(self, set_cmake_flags=True)
         cmake.verbose = True
@@ -283,9 +287,10 @@ class LLVMToolsConan(ConanFile):
             cmake.definitions["CLANG_TOOL_CLANG_FUZZER_BUILD"]="ON"
 
         # NOTE: msan build requires
-        # existing file ~/.conan/data/llvm_tools/master/conan/stable/package/.../lib/clang/10.0.1/lib/linux/libclang_rt.msan_cxx-x86_64.a
+        # existing file ~/.conan/data/llvm_9/master/conan/stable/package/.../lib/clang/10.0.1/lib/linux/libclang_rt.msan_cxx-x86_64.a
         # same for tsan\ubsan\asan\etc.
-        cmake.definitions["COMPILER_RT_BUILD_SANITIZERS"]="ON"
+        cmake.definitions["COMPILER_RT_BUILD_SANITIZERS"] = "ON" \
+          if len(llvm_sanitizer) > 0 else "OFF"
 
         # TODO: make customizable
         #cmake.definitions["CMAKE_CXX_STANDARD"]="17"
@@ -368,7 +373,8 @@ class LLVMToolsConan(ConanFile):
         cmake.definitions["LLVM_TOOL_LIBUNWIND_BUILD"]="ON"
 
         # sanitizers to build if supported on the target (all;asan;dfsan;msan;tsan;safestack;cfi;esan;scudo)
-        cmake.definitions["COMPILER_RT_SANITIZERS_TO_BUILD"]="asan;msan;tsan;safestack;cfi;esan"
+        cmake.definitions["COMPILER_RT_SANITIZERS_TO_BUILD"]= "asan;msan;tsan;safestack;cfi;esan" \
+          if len(llvm_sanitizer) > 0 else ""
 
         # TODO: custom C++ stdlib requires custom include paths
         # Default C++ stdlib to use ("libstdc++" or "libc++", empty for platform default
@@ -525,9 +531,6 @@ class LLVMToolsConan(ConanFile):
               self.output.info('IGNORED copying %s' % (item))
 
     def package(self):
-        self.output.info('self.settings.os: %s' % (self.settings.os))
-        self.output.info('self.settings.build_type: %s' % (self.settings.build_type))
-
         llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
 
         package_bin_dir = os.path.join(self.package_folder, "bin")
@@ -543,6 +546,10 @@ class LLVMToolsConan(ConanFile):
           '{}/bin'.format(self.build_folder), \
           '{}/bin'.format(self.package_folder))
 
+        self.copytree( \
+          '{}/libexec'.format(self.build_folder), \
+          '{}/libexec'.format(self.package_folder))
+
         # keep_path=True required by `/include/c++/v1/`
         self.copytree( \
           '{}/include'.format(self.build_folder), \
@@ -553,29 +560,32 @@ class LLVMToolsConan(ConanFile):
           '{}/lib'.format(self.build_folder), \
           '{}/lib'.format(self.package_folder))
 
-        self.output.info('packaged for os: %s' % (self.settings.os))
+        self.output.info('packaged for os: %s' % (self.settings.os_build))
 
+    # NOTE: do not append packaged paths to env_info.PATH, env_info.LD_LIBRARY_PATH, etc.
+    # because it can conflict with system compiler
+    # https://stackoverflow.com/q/54273632
     def package_info(self):
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.bindirs = ["bin", "libexec"]
-        self.env_info.LD_LIBRARY_PATH.append(
-            os.path.join(self.package_folder, "lib"))
-        self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
-        self.env_info.PATH.append(os.path.join(self.package_folder, "libexec"))
-        for libpath in self.deps_cpp_info.lib_paths:
-            self.env_info.LD_LIBRARY_PATH.append(libpath)
+        #self.env_info.LD_LIBRARY_PATH.append(
+        #    os.path.join(self.package_folder, "lib"))
+        #self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
+        #self.env_info.PATH.append(os.path.join(self.package_folder, "libexec"))
+        #for libpath in self.deps_cpp_info.lib_paths:
+        #    self.env_info.LD_LIBRARY_PATH.append(libpath)
 
-        if self.settings.os == "Linux":
+        if self.settings.os_build == "Linux":
             self.cpp_info.libs.extend(["pthread", "m", "dl"])
             if self.settings.compiler == "clang" and self.settings.compiler.libcxx == "libstdc++":
                 self.cpp_info.libs.append("atomic")
-        elif self.settings.os == "Windows" and self.settings.compiler == "Visual Studio":
+        elif self.settings.os_build == "Windows" and self.settings.compiler == "Visual Studio":
             self.cpp_info.libs.extend(["ws2_32", "Iphlpapi", "Crypt32"])
 
-        if (self.settings.os == "Linux" and self.settings.compiler == "clang" and
+        if (self.settings.os_build == "Linux" and self.settings.compiler == "clang" and
            Version(self.settings.compiler.version.value) == "6" and self.settings.compiler.libcxx == "libstdc++") or \
-           (self.settings.os == "Macos" and self.settings.compiler == "apple-clang" and
+           (self.settings.os_build == "Macos" and self.settings.compiler == "apple-clang" and
            Version(self.settings.compiler.version.value) == "9.0" and self.settings.compiler.libcxx == "libc++"):
             self.cpp_info.libs.append("atomic")
 
@@ -585,16 +595,25 @@ class LLVMToolsConan(ConanFile):
         bindir = os.path.join(self.package_folder, "bin")
         libexec = os.path.join(self.package_folder, "libexec")
         self.output.info("Appending PATH environment variable: {}".format(bindir))
-        self.env_info.PATH.append(bindir)
+        #self.env_info.PATH.append(bindir)
         self.output.info("Appending PATH environment variable: {}".format(libexec))
-        self.env_info.PATH.append(libexec)
+        #self.env_info.PATH.append(libexec)
 
         libdir = os.path.join(self.package_folder, "lib")
         self.output.info("Appending PATH environment variable: {}".format(libdir))
-        self.env_info.PATH.append(libdir)
+        #self.env_info.PATH.append(libdir)
 
         self.cpp_info.libs += list(self.llvm_libs.keys())
 
         self.output.info("LIBRARIES: %s" % self.cpp_info.libs)
         self.output.info("Package folder: %s" % self.package_folder)
-        self.env_info.CONAN_LLVM_TOOLS_ROOT = self.package_folder
+        self.env_info.CONAN_LLVM_9_ROOT = self.package_folder
+
+    # TODO: clang++-9 does not depend on arch,
+    # but tooling libs  depend on arch...
+    def package_id(self):
+        self.info.include_build_settings()
+        if self.settings.os_build == "Windows":
+            del self.info.settings.arch_build # same build is used for x86 and x86_64
+        del self.info.settings.arch
+        del self.info.settings.compiler

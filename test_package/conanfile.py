@@ -8,6 +8,9 @@ class TestPackageConan(ConanFile):
 
     def build(self):
         cmake = CMake(self)
+        cmake.definitions["CONAN_DISABLE_CHECK_COMPILER"] = "ON"
+        cmake.definitions["CMAKE_C_COMPILER_FORCED"] = "TRUE"
+        cmake.definitions["CMAKE_CXX_COMPILER_FORCED"] = "TRUE"
         cmake.configure()
         cmake.build()
 

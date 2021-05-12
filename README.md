@@ -1,6 +1,8 @@
 # About
 
-NOTE: use `-s llvm_tools:build_type=Release` during `conan install`
+Release llvm 9.0.1
+
+NOTE: use `-s llvm_9:build_type=Release` during `conan install`
 
 conan package for llvm tools:
 
@@ -17,16 +19,16 @@ conan package for llvm tools:
 
 See `test_package/CMakeLists.txt` for usage example
 
-NOTE: use `find_program` with `${CONAN_BIN_DIRS}` or `${CONAN_BIN_DIRS_LLVM_TOOLS}` like below:
+NOTE: use `find_program` with `${CONAN_BIN_DIRS}` or `${CONAN_BIN_DIRS_LLVM_9}` like below:
 
 ```cmake
 list(APPEND CMAKE_PROGRAM_PATH ${CONAN_BIN_DIRS})
-list(APPEND CMAKE_PROGRAM_PATH ${CONAN_BIN_DIRS_LLVM_TOOLS})
+list(APPEND CMAKE_PROGRAM_PATH ${CONAN_BIN_DIRS_LLVM_9})
 
 find_program(CLANG_TIDY clang-tidy
   PATHS
     ${CONAN_BIN_DIRS}
-    ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    ${CONAN_BIN_DIRS_LLVM_9}
   NO_SYSTEM_ENVIRONMENT_PATH
   NO_CMAKE_SYSTEM_PATH
 )
@@ -37,7 +39,7 @@ endif()
 find_program(SCAN_BUILD scan-build
   PATHS
     ${CONAN_BIN_DIRS}
-    ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    ${CONAN_BIN_DIRS_LLVM_9}
   NO_SYSTEM_ENVIRONMENT_PATH
   NO_CMAKE_SYSTEM_PATH
 )
@@ -45,21 +47,21 @@ if(NOT SCAN_BUILD)
   message(FATAL_ERROR "scan-build not found")
 endif()
 
-find_program(CLANG_10 clang-10
+find_program(CLANG_9 clang-9
   PATHS
     ${CONAN_BIN_DIRS}
-    ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    ${CONAN_BIN_DIRS_LLVM_9}
   NO_SYSTEM_ENVIRONMENT_PATH
   NO_CMAKE_SYSTEM_PATH
 )
-if(NOT CLANG_10)
-  message(FATAL_ERROR "clang-10 not found")
+if(NOT CLANG_9)
+  message(FATAL_ERROR "clang-9 not found")
 endif()
 
 find_program(CCC_ANALYZER ccc-analyzer
   PATHS
     ${CONAN_BIN_DIRS}
-    ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    ${CONAN_BIN_DIRS_LLVM_9}
   NO_SYSTEM_ENVIRONMENT_PATH
   NO_CMAKE_SYSTEM_PATH
 )
@@ -70,7 +72,7 @@ endif()
 find_program(CPP_ANALYZER c++-analyzer
   PATHS
     ${CONAN_BIN_DIRS}
-    ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    ${CONAN_BIN_DIRS_LLVM_9}
   NO_SYSTEM_ENVIRONMENT_PATH
   NO_CMAKE_SYSTEM_PATH
 )
@@ -81,7 +83,7 @@ endif()
 find_program(CLANG_FORMAT clang-format
   PATHS
     ${CONAN_BIN_DIRS}
-    ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    ${CONAN_BIN_DIRS_LLVM_9}
   NO_SYSTEM_ENVIRONMENT_PATH
   NO_CMAKE_SYSTEM_PATH
 )
@@ -92,7 +94,7 @@ endif()
 find_program(IWYU include-what-you-use
   PATHS
     ${CONAN_BIN_DIRS}
-    ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    ${CONAN_BIN_DIRS_LLVM_9}
   NO_SYSTEM_ENVIRONMENT_PATH
   NO_CMAKE_SYSTEM_PATH
 )
@@ -104,11 +106,11 @@ endif()
 You can change compiler to clang from conan package like so:
 
 ```cmake
-  # use llvm_tools from conan
+  # use llvm_9 from conan
   find_program(CLANG_PROGRAM clang
     PATHS
       #${CONAN_BIN_DIRS}
-      ${CONAN_BIN_DIRS_LLVM_TOOLS}
+      ${CONAN_BIN_DIRS_LLVM_9}
     NO_SYSTEM_ENVIRONMENT_PATH
     NO_CMAKE_SYSTEM_PATH
   )
@@ -153,6 +155,8 @@ Add before `include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)`:
   # do not check compile in conanbuildinfo
   # cause we will switch to other compiler after conan install
   set(CONAN_DISABLE_CHECK_COMPILER ON)
+  set(CMAKE_C_COMPILER_FORCED TRUE)
+  set(CMAKE_CXX_COMPILER_FORCED TRUE)
 ```
 
 You can use `libc++` from conan package like so:
@@ -161,8 +165,8 @@ You can use `libc++` from conan package like so:
   find_path(
     LIBCXX_LIBCXXABI_INCLUDE_FILE cxxabi.h
     PATHS
-      ${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1
-      ${CONAN_INCLUDE_DIRS_LLVM_TOOLS}
+      ${CONAN_LLVM_9_ROOT}/include/c++/v1
+      ${CONAN_INCLUDE_DIRS_LLVM_9}
     NO_DEFAULT_PATH
     NO_CMAKE_FIND_ROOT_PATH
   )
@@ -175,8 +179,8 @@ You can use `libc++` from conan package like so:
     NAMES
       c++
     PATHS
-      ${CONAN_LIB_DIRS_LLVM_TOOLS}
-      ${CONAN_BIN_DIRS_LLVM_TOOLS}
+      ${CONAN_LIB_DIRS_LLVM_9}
+      ${CONAN_BIN_DIRS_LLVM_9}
     NO_SYSTEM_ENVIRONMENT_PATH
     NO_CMAKE_SYSTEM_PATH
   )
@@ -189,8 +193,8 @@ You can use `libc++` from conan package like so:
     NAMES
     c++abi
     PATHS
-      ${CONAN_LIB_DIRS_LLVM_TOOLS}
-      ${CONAN_BIN_DIRS_LLVM_TOOLS}
+      ${CONAN_LIB_DIRS_LLVM_9}
+      ${CONAN_BIN_DIRS_LLVM_9}
     NO_SYSTEM_ENVIRONMENT_PATH
     NO_CMAKE_SYSTEM_PATH
   )
@@ -200,24 +204,24 @@ You can use `libc++` from conan package like so:
     DIRECTORY)
 
   include_directories(
-    "${CONAN_LLVM_TOOLS_ROOT}/include"
-    "${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1")
+    "${CONAN_LLVM_9_ROOT}/include"
+    "${CONAN_LLVM_9_ROOT}/include/c++/v1")
 
   set(CMAKE_CXX_FLAGS
     "${CMAKE_CXX_FLAGS} \
-    -I${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1 \
-    -I${CONAN_LLVM_TOOLS_ROOT}/include")
+    -I${CONAN_LLVM_9_ROOT}/include/c++/v1 \
+    -I${CONAN_LLVM_9_ROOT}/include")
 
-  link_directories("${CONAN_LLVM_TOOLS_ROOT}/lib")
+  link_directories("${CONAN_LLVM_9_ROOT}/lib")
   link_directories("${CLANG_LIBCPP_DIR}")
 
   set(CMAKE_CXX_FLAGS
     "${CMAKE_CXX_FLAGS} \
     -Wno-unused-command-line-argument \
-    -L${CONAN_LLVM_TOOLS_ROOT}/lib \
+    -L${CONAN_LLVM_9_ROOT}/lib \
     -L${CLANG_LIBCPP_DIR} \
     -Wl,-rpath,${CLANG_LIBCPPABI_DIR} \
-    -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
+    -Wl,-rpath,${CONAN_LLVM_9_ROOT}/lib \
     -stdlib=libc++ -lc++abi -lc++ -lm -lc -fuse-ld=lld")
 
   add_compile_options(
@@ -228,7 +232,7 @@ You can use `libc++` from conan package like so:
       "-v")
 ```
 
-See for example `macro(compile_with_llvm_tools)` from [https://github.com/blockspacer/cmake_helper_utils_conan/blob/master/cmake/Findcmake_helper_utils.cmake](https://github.com/blockspacer/cmake_helper_utils_conan/blob/master/cmake/Findcmake_helper_utils.cmake)
+See for example `macro(compile_with_llvm_9)` from [https://github.com/blockspacer/cmake_helper_utils_conan/blob/master/cmake/Findcmake_helper_utils.cmake](https://github.com/blockspacer/cmake_helper_utils_conan/blob/master/cmake/Findcmake_helper_utils.cmake)
 
 ## Supported platforms
 
@@ -255,12 +259,18 @@ See [https://github.com/include-what-you-use/include-what-you-use/issues/802#iss
 
 ## Before build
 
+Based on https://lldb.llvm.org/resources/build.html
+
 ```bash
 sudo apt-get update
 
 sudo apt-get -y install autoconf automake bison build-essential \
 ca-certificates llvm-dev libtool libtool-bin \
 libglib2.0-dev make nasm wget
+
+sudo apt-get install build-essential subversion swig python3-dev libedit-dev libncurses5-dev
+
+sudo apt-get install libncurses5-dev libncursesw5-dev libtinfo-dev
 
 # Tested with clang 10 and gcc 7
 sudo apt-get -y install clang-10 g++-7 gcc-7
@@ -269,9 +279,9 @@ sudo apt-get -y install clang-10 g++-7 gcc-7
 export LLVM_CONFIG=/usr/bin/llvm-config-10
 $LLVM_CONFIG --cxxflags
 
-sudo apt-get install libncurses5-dev libncursesw5-dev libtinfo-dev
-
-# optionaL: swig4, libeidt-dev
+# use python3
+sudo update-alternatives --config python
+python --version
 ```
 
 read https://llvm.org/docs/CMake.html and https://fuchsia.dev/fuchsia-src/development/build/toolchain and https://github.com/deepinwiki/wiki/wiki/%E7%94%A8LLVM%E7%BC%96%E8%AF%91%E5%86%85%E6%A0%B8
@@ -324,7 +334,7 @@ $CXX --version
 
 conan remote add conan-center https://api.bintray.com/conan/conan/conan-center False
 
-export PKG_NAME=llvm_tools/master@conan/stable
+export PKG_NAME=llvm_9/master@conan/stable
 
 (CONAN_REVISIONS_ENABLED=1 \
     conan remove --force $PKG_NAME || true)
@@ -348,62 +358,9 @@ CONAN_REVISIONS_ENABLED=1 \
     conan upload $PKG_NAME --all -r=conan-local -c --retry 3 --retry-wait 10 --force
 ```
 
-## conan Flow
-
-```bash
-export CC=gcc
-export CXX=g++
-
-# https://www.pclinuxos.com/forum/index.php?topic=129566.0
-# export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
-
-# If compilation of LLVM fails on your machine (`make` may be killed by OS due to lack of RAM e.t.c.)
-# - set env. var. CONAN_LLVM_SINGLE_THREAD_BUILD to 1.
-export CONAN_LLVM_SINGLE_THREAD_BUILD=1
-export CONAN_REVISIONS_ENABLED=1
-export CONAN_VERBOSE_TRACEBACK=1
-export CONAN_PRINT_RUN_COMMANDS=1
-export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
-
-$CC --version
-$CXX --version
-
-# see BUGFIX (i386 instead of x86_64)
-export CXXFLAGS=-m64
-export CFLAGS=-m64
-export LDFLAGS=-m64
-
-conan source .
-
-conan install --build missing --build cascade --profile clang  -s build_type=Release .
-
-conan build . \
-  --build-folder . \
-  --source-folder .
-
-conan package . \
-  --build-folder . \
-  --package-folder . \
-  --source-folder .
-
-# remove before `conan export-pkg`
-conan remove llvm_tools
-
-conan export-pkg . \
-  conan/stable \
-  --package-folder . \
-  --settings build_type=Release \
-  --force \
-  --profile clang \
-  -o llvm_tools:include_what_you_use=True
-
-conan test test_package llvm_tools/master@conan/stable --settings build_type=Release --profile clang
-```
-
 ## Build with sanitizers support
 
-Use `-o llvm_tools:enable_msan=True` like so:
+Use `-o llvm_9:enable_msan=True` like so:
 
 ```bash
 export CC=gcc
@@ -437,8 +394,8 @@ CONAN_REVISIONS_ENABLED=1 \
     conan create . conan/stable \
       -s build_type=Release \
       --profile clang \
-      -o llvm_tools:include_what_you_use=False \
-      -o llvm_tools:enable_msan=True
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_msan=True
 ```
 
 NOTE: msan requires to set `-stdlib=libc++ -lc++abi` and use include and lib paths from conan package (see above). See https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo#instrumented-gtest
@@ -450,28 +407,28 @@ Perform checks:
 find ~/.conan -name libclang_rt.msan_cxx-x86_64.a
 
 # see https://stackoverflow.com/a/47705420
-nm -an $(find ~/.conan -name *libc++.so.1 | grep "llvm_tools/master/conan/stable/package/") | grep san
+nm -an $(find ~/.conan -name *libc++.so.1 | grep "llvm_9/master/conan/stable/package/") | grep san
 ```
 
 ## Avoid Debug build, prefer Release builds
 
 Debug build of llvm may take a lot of time or crash due to lack of RAM or CPU
 
-## How to keep multiple llvm_tools package revisions in local cache
+## How to keep multiple llvm_9 package revisions in local cache
 
 Usually you want to build LLVM in multiple configurations and re-use pre-built packages. Approach below allows to avoid full re-builds via `conan create` on each change in options.
 
 Option 1: Create conan server. Solves problem because only conan client can have only one revision installed simultaneously (see https://github.com/conan-io/conan/issues/6836 )
 
-Option 2: Store on disk multiple pre-built llvm_tools packages. Export desired version and work with that version globally.
+Option 2: Store on disk multiple pre-built llvm_9 packages. Export desired version and work with that version globally.
 
 Example below shows how to install multiple LLVM revisions: both with default options and with sanitizer (MSAN) enabled (not that you can enable only one of them globally using `conan export-pkg`).
 
-## How to perform checks
+## How to check that sanitizers enabled
 
 ```bash
 # see https://stackoverflow.com/a/47705420
-nm -an $(find ~/.conan -name *libc++.so.1 | grep "llvm_tools/master/conan/stable/package/") | grep san
+nm -an $(find ~/.conan -name *libc++.so.1 | grep "llvm_9/master/conan/stable/package/") | grep san
 ```
 
 Validate that `ldd` points to instrumented `libc++`, see https://stackoverflow.com/a/35197295
@@ -526,7 +483,7 @@ GIT_SSL_NO_VERIFY=true \
     conan install . \
     --install-folder local_build \
     -s build_type=Release \
-    -s llvm_tools:build_type=Release \
+    -s llvm_9:build_type=Release \
     --profile clang
 
 CONAN_REVISIONS_ENABLED=1 \
@@ -535,7 +492,9 @@ CONAN_PRINT_RUN_COMMANDS=1 \
 CONAN_LOGGING_LEVEL=10 \
 GIT_SSL_NO_VERIFY=true \
   cmake -E time \
-    conan source . --source-folder local_build
+    conan source . \
+    --source-folder local_build \
+    --install-folder local_build
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -544,10 +503,12 @@ CONAN_REVISIONS_ENABLED=1 \
   GIT_SSL_NO_VERIFY=true \
   conan build . \
     --build-folder local_build \
-    --source-folder local_build
+    --source-folder local_build \
+    --install-folder local_build
 
 # remove before `conan export-pkg`
-conan remove llvm_tools
+(CONAN_REVISIONS_ENABLED=1 \
+    conan remove --force llvm_9 || true)
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -557,12 +518,9 @@ CONAN_REVISIONS_ENABLED=1 \
   conan package . \
     --build-folder local_build \
     --package-folder local_build/package_dir \
-    --source-folder local_build
-```
+    --source-folder local_build \
+    --install-folder local_build
 
-Now use `conan export-pkg` (or conan editable mode) to globally enable some revision of llvm_tools package.
-
-```bash
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
   CONAN_PRINT_RUN_COMMANDS=1 \
@@ -573,8 +531,7 @@ CONAN_REVISIONS_ENABLED=1 \
     --package-folder local_build/package_dir \
     --settings build_type=Release \
     --force \
-    --profile clang \
-    -o llvm_tools:include_what_you_use=True
+    --profile clang
 
 rm -rf local_build/package_dir
 ```
@@ -614,9 +571,9 @@ GIT_SSL_NO_VERIFY=true \
     conan install . \
     --install-folder local_build_iwyu \
     -s build_type=Release \
-    -s llvm_tools:build_type=Release \
+    -s llvm_9:build_type=Release \
     --profile clang \
-      -o llvm_tools:include_what_you_use=True
+      -o llvm_9:include_what_you_use=True
 
 CONAN_REVISIONS_ENABLED=1 \
 CONAN_VERBOSE_TRACEBACK=1 \
@@ -624,7 +581,9 @@ CONAN_PRINT_RUN_COMMANDS=1 \
 CONAN_LOGGING_LEVEL=10 \
 GIT_SSL_NO_VERIFY=true \
   cmake -E time \
-    conan source . --source-folder local_build_iwyu
+    conan source . \
+    --source-folder local_build_iwyu \
+    --install-folder local_build_iwyu
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -633,10 +592,12 @@ CONAN_REVISIONS_ENABLED=1 \
   GIT_SSL_NO_VERIFY=true \
   conan build . \
     --build-folder local_build_iwyu \
-    --source-folder local_build_iwyu
+    --source-folder local_build_iwyu \
+    --install-folder local_build_iwyu
 
 # remove before `conan export-pkg`
-conan remove llvm_tools
+(CONAN_REVISIONS_ENABLED=1 \
+    conan remove --force llvm_9 || true)
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -646,12 +607,9 @@ CONAN_REVISIONS_ENABLED=1 \
   conan package . \
     --build-folder local_build_iwyu \
     --package-folder local_build_iwyu/package_dir \
-    --source-folder local_build_iwyu
-```
+    --source-folder local_build_iwyu \
+    --install-folder local_build_iwyu
 
-Now use `conan export-pkg` (or conan editable mode) to globally enable some revision of llvm_tools package.
-
-```bash
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
   CONAN_PRINT_RUN_COMMANDS=1 \
@@ -663,7 +621,14 @@ CONAN_REVISIONS_ENABLED=1 \
     --settings build_type=Release \
     --force \
     --profile clang \
-      -o llvm_tools:include_what_you_use=True
+      -o llvm_9:include_what_you_use=True
+
+cmake -E time \
+  conan test test_package llvm_9/master@conan/stable \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang \
+      -o llvm_9:include_what_you_use=True
 
 rm -rf local_build_iwyu/package_dir
 ```
@@ -703,10 +668,10 @@ GIT_SSL_NO_VERIFY=true \
     conan install . \
     --install-folder local_build_msan \
     -s build_type=Release \
-    -s llvm_tools:build_type=Release \
+    -s llvm_9:build_type=Release \
     --profile clang \
-      -o llvm_tools:include_what_you_use=False \
-      -o llvm_tools:enable_msan=True
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_msan=True
 
 CONAN_REVISIONS_ENABLED=1 \
 CONAN_VERBOSE_TRACEBACK=1 \
@@ -723,10 +688,12 @@ CONAN_REVISIONS_ENABLED=1 \
   GIT_SSL_NO_VERIFY=true \
   conan build . \
     --build-folder local_build_msan \
-    --source-folder local_build_msan
+    --source-folder local_build_msan \
+    --install-folder local_build_msan
 
 # remove before `conan export-pkg`
-conan remove llvm_tools
+(CONAN_REVISIONS_ENABLED=1 \
+    conan remove --force llvm_9 || true)
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -736,12 +703,9 @@ CONAN_REVISIONS_ENABLED=1 \
   conan package . \
     --build-folder local_build_msan \
     --package-folder local_build_msan/package_dir \
-    --source-folder local_build_msan
-```
+    --source-folder local_build_msan \
+    --install-folder local_build_msan
 
-Now use `conan export-pkg` (or conan editable mode) to globally enable some revision of llvm_tools package.
-
-```bash
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
   CONAN_PRINT_RUN_COMMANDS=1 \
@@ -753,8 +717,16 @@ CONAN_REVISIONS_ENABLED=1 \
     --settings build_type=Release \
     --force \
     --profile clang \
-      -o llvm_tools:include_what_you_use=False \
-      -o llvm_tools:enable_msan=True
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_msan=True
+
+cmake -E time \
+  conan test test_package llvm_9/master@conan/stable \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang \
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_msan=True
 
 # llvm-ar, llvm-symbolizer, etc. must be NOT sanitized,
 # but libc++, libc++abi, compiler-rt must be sanitized
@@ -798,10 +770,10 @@ GIT_SSL_NO_VERIFY=true \
     conan install . \
     --install-folder local_build_asan \
     -s build_type=Release \
-    -s llvm_tools:build_type=Release \
+    -s llvm_9:build_type=Release \
     --profile clang \
-      -o llvm_tools:include_what_you_use=False \
-      -o llvm_tools:enable_asan=True
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_asan=True
 
 CONAN_REVISIONS_ENABLED=1 \
 CONAN_VERBOSE_TRACEBACK=1 \
@@ -809,7 +781,9 @@ CONAN_PRINT_RUN_COMMANDS=1 \
 CONAN_LOGGING_LEVEL=10 \
 GIT_SSL_NO_VERIFY=true \
   cmake -E time \
-    conan source . --source-folder local_build_asan
+    conan source . \
+    --source-folder local_build_asan \
+    --install-folder local_build_asan
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -818,10 +792,12 @@ CONAN_REVISIONS_ENABLED=1 \
   GIT_SSL_NO_VERIFY=true \
   conan build . \
     --build-folder local_build_asan \
-    --source-folder local_build_asan
+    --source-folder local_build_asan \
+    --install-folder local_build_asan
 
 # remove before `conan export-pkg`
-conan remove llvm_tools
+(CONAN_REVISIONS_ENABLED=1 \
+    conan remove --force llvm_9 || true)
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -831,12 +807,9 @@ CONAN_REVISIONS_ENABLED=1 \
   conan package . \
     --build-folder local_build_asan \
     --package-folder local_build_asan/package_dir \
-    --source-folder local_build_asan
-```
+    --source-folder local_build_asan \
+    --install-folder local_build_asan
 
-Now use `conan export-pkg` (or conan editable mode) to globally enable some revision of llvm_tools package.
-
-```bash
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
   CONAN_PRINT_RUN_COMMANDS=1 \
@@ -848,8 +821,16 @@ CONAN_REVISIONS_ENABLED=1 \
     --settings build_type=Release \
     --force \
     --profile clang \
-      -o llvm_tools:include_what_you_use=False \
-      -o llvm_tools:enable_asan=True
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_asan=True
+
+cmake -E time \
+  conan test test_package llvm_9/master@conan/stable \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang \
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_asan=True
 
 # llvm-ar, llvm-symbolizer, etc. must be NOT sanitized,
 # but libc++, libc++abi, compiler-rt must be sanitized
@@ -893,10 +874,10 @@ GIT_SSL_NO_VERIFY=true \
     conan install . \
     --install-folder local_build_tsan \
     -s build_type=Release \
-    -s llvm_tools:build_type=Release \
+    -s llvm_9:build_type=Release \
     --profile clang \
-      -o llvm_tools:include_what_you_use=False \
-      -o llvm_tools:enable_tsan=True
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_tsan=True
 
 CONAN_REVISIONS_ENABLED=1 \
 CONAN_VERBOSE_TRACEBACK=1 \
@@ -904,7 +885,9 @@ CONAN_PRINT_RUN_COMMANDS=1 \
 CONAN_LOGGING_LEVEL=10 \
 GIT_SSL_NO_VERIFY=true \
   cmake -E time \
-    conan source . --source-folder local_build_tsan
+    conan source . \
+    --source-folder local_build_tsan \
+    --install-folder local_build_tsan
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -913,10 +896,12 @@ CONAN_REVISIONS_ENABLED=1 \
   GIT_SSL_NO_VERIFY=true \
   conan build . \
     --build-folder local_build_tsan \
-    --source-folder local_build_tsan
+    --source-folder local_build_tsan \
+    --install-folder local_build_tsan
 
 # remove before `conan export-pkg`
-conan remove llvm_tools
+(CONAN_REVISIONS_ENABLED=1 \
+    conan remove --force llvm_9 || true)
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -926,12 +911,9 @@ CONAN_REVISIONS_ENABLED=1 \
   conan package . \
     --build-folder local_build_tsan \
     --package-folder local_build_tsan/package_dir \
-    --source-folder local_build_tsan
-```
+    --source-folder local_build_tsan \
+    --install-folder local_build_tsan
 
-Now use `conan export-pkg` (or conan editable mode) to globally enable some revision of llvm_tools package.
-
-```bash
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
   CONAN_PRINT_RUN_COMMANDS=1 \
@@ -943,8 +925,16 @@ CONAN_REVISIONS_ENABLED=1 \
     --settings build_type=Release \
     --force \
     --profile clang \
-      -o llvm_tools:include_what_you_use=False \
-      -o llvm_tools:enable_tsan=True
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_tsan=True
+
+cmake -E time \
+  conan test test_package llvm_9/master@conan/stable \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang \
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_tsan=True
 
 # llvm-ar, llvm-symbolizer, etc. must be NOT sanitized,
 # but libc++, libc++abi, compiler-rt must be sanitized
@@ -988,10 +978,10 @@ GIT_SSL_NO_VERIFY=true \
     conan install . \
     --install-folder local_build_ubsan \
     -s build_type=Release \
-    -s llvm_tools:build_type=Release \
+    -s llvm_9:build_type=Release \
     --profile clang \
-      -o llvm_tools:include_what_you_use=False \
-      -o llvm_tools:enable_ubsan=True
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_ubsan=True
 
 CONAN_REVISIONS_ENABLED=1 \
 CONAN_VERBOSE_TRACEBACK=1 \
@@ -999,7 +989,9 @@ CONAN_PRINT_RUN_COMMANDS=1 \
 CONAN_LOGGING_LEVEL=10 \
 GIT_SSL_NO_VERIFY=true \
   cmake -E time \
-    conan source . --source-folder local_build_ubsan
+    conan source . \
+    --source-folder local_build_ubsan \
+    --install-folder local_build_ubsan
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -1008,10 +1000,12 @@ CONAN_REVISIONS_ENABLED=1 \
   GIT_SSL_NO_VERIFY=true \
   conan build . \
     --build-folder local_build_ubsan \
-    --source-folder local_build_ubsan
+    --source-folder local_build_ubsan \
+    --install-folder local_build_ubsan
 
 # remove before `conan export-pkg`
-conan remove llvm_tools
+(CONAN_REVISIONS_ENABLED=1 \
+    conan remove --force llvm_9 || true)
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
@@ -1021,12 +1015,9 @@ CONAN_REVISIONS_ENABLED=1 \
   conan package . \
     --build-folder local_build_ubsan \
     --package-folder local_build_ubsan/package_dir \
-    --source-folder local_build_ubsan
-```
+    --source-folder local_build_ubsan \
+    --install-folder local_build_ubsan
 
-Now use `conan export-pkg` (or conan editable mode) to globally enable some revision of llvm_tools package.
-
-```bash
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \
   CONAN_PRINT_RUN_COMMANDS=1 \
@@ -1038,8 +1029,16 @@ CONAN_REVISIONS_ENABLED=1 \
     --settings build_type=Release \
     --force \
     --profile clang \
-      -o llvm_tools:include_what_you_use=False \
-      -o llvm_tools:enable_ubsan=True
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_ubsan=True
+
+cmake -E time \
+  conan test test_package llvm_9/master@conan/stable \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang \
+      -o llvm_9:include_what_you_use=False \
+      -o llvm_9:enable_ubsan=True
 
 # llvm-ar, llvm-symbolizer, etc. must be NOT sanitized,
 # but libc++, libc++abi, compiler-rt must be sanitized
