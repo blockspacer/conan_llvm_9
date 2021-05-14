@@ -257,6 +257,31 @@ MIT for conan package. Packaged source uses own license, see https://releases.ll
 
 See [https://github.com/include-what-you-use/include-what-you-use/issues/802#issuecomment-661058223](https://github.com/include-what-you-use/include-what-you-use/issues/802#issuecomment-661058223)
 
+## Best practices
+
+`CONAN_DISABLE_CHECK_COMPILER` is bad practice.
+
+Use approach similar to https://github.com/blockspacer/llvm_9_installer
+
+Best practice is to create separate recipe that depends on llvm package and populate env. vars.
+
+```python
+  # see https://docs.conan.io/en/latest/systems_cross_building/cross_building.html
+  self.env_info.CXX = os.path.join(llvm_root, "bin", "clang++")
+  self.env_info.CC = os.path.join(llvm_root, "bin", "clang")
+  self.env_info.AR = os.path.join(llvm_root, "bin", "llvm-ar")
+  self.env_info.STRIP = os.path.join(llvm_root, "bin", "llvm-strip")
+  self.env_info.LD = os.path.join(llvm_root, "bin", "ld.lld") # llvm-ld replaced by llvm-ld
+  self.env_info.NM = os.path.join(llvm_root, "bin", "llvm-nm")
+  # TODO: propagate to CMAKE_OBJDUMP?
+  self.env_info.OBJDUMP = os.path.join(llvm_root, "bin", "llvm-objdump")
+  self.env_info.SYMBOLIZER = os.path.join(llvm_root, "bin", "llvm-symbolizer")
+  self.env_info.RANLIB = os.path.join(llvm_root, "bin", "llvm-ranlib")
+  self.env_info.AS = os.path.join(llvm_root, "bin", "llvm-as")
+  # TODO: llvm-rc-rc or llvm-rc?
+  self.env_info.RC = os.path.join(llvm_root, "bin", "llvm-rc")
+```
+
 ## Before build
 
 Based on https://lldb.llvm.org/resources/build.html
@@ -679,7 +704,9 @@ CONAN_PRINT_RUN_COMMANDS=1 \
 CONAN_LOGGING_LEVEL=10 \
 GIT_SSL_NO_VERIFY=true \
   cmake -E time \
-    conan source . --source-folder local_build_msan
+    conan source . \
+    --source-folder local_build_msan \
+    --install-folder local_build_msan
 
 CONAN_REVISIONS_ENABLED=1 \
   CONAN_VERBOSE_TRACEBACK=1 \

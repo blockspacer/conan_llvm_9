@@ -39,7 +39,7 @@ class LLVM9Conan(ConanFile):
     default_options = {
         "force_x86_64": True,
         "link_ltinfo": False,
-        "include_what_you_use": False,
+        "include_what_you_use": True,
         "enable_msan": False,
         "enable_tsan": False,
         "enable_ubsan": False,
@@ -222,7 +222,8 @@ class LLVM9Conan(ConanFile):
 
         if self.options.link_ltinfo:
             # https://github.com/MaskRay/ccls/issues/556
-            cmake.definitions["CMAKE_CXX_LINKER_FLAGS"]="-ltinfo"
+            # https://stackoverflow.com/a/51924150
+            cmake.definitions["CMAKE_CXX_LINKER_FLAGS"]="-lncurses -ltinfo"
 
         # Semicolon-separated list of runtimes to build (libcxx;libcxxabi;libunwind;compiler-rt), or "all".
         cmake.definitions["LLVM_ENABLE_RUNTIMES"]=llvm_runtimes
@@ -295,12 +296,11 @@ class LLVM9Conan(ConanFile):
         # TODO: make customizable
         #cmake.definitions["CMAKE_CXX_STANDARD"]="17"
 
+        cmake.definitions["BUILD_SHARED_LIBS"]="ON" # TODO: use option
         if self.options.enable_msan:
           # Static linking is not supported.
           # see https://clang.llvm.org/docs/MemorySanitizer.html
           cmake.definitions["BUILD_SHARED_LIBS"]="ON"
-        else:
-          cmake.definitions["BUILD_SHARED_LIBS"]="OFF"
 
         # TODO: make customizable
         #cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"]="ON"
@@ -535,6 +535,19 @@ class LLVM9Conan(ConanFile):
 
         package_bin_dir = os.path.join(self.package_folder, "bin")
 
+        configure_llvm_projects = "clang;clang-tools-extra;libunwind;lld;lldb;libcxx;libcxxabi;compiler-rt"
+        if self.options.enable_msan:
+            # we will build `libcxx;libcxxabi;compiler-rt` separately if sanitizer enabled
+            configure_llvm_projects = "clang;clang-tools-extra;compiler-rt;libunwind;lld;lldb"
+
+        # NOTE: builds `libcxx;libcxxabi;compiler-rt;` separately (for sanitizers support)
+        cmake = self._configure_cmake(llvm_projects = configure_llvm_projects, \
+            #llvm_runtimes = "compiler-rt;libunwind" \
+            llvm_runtimes = "",
+        )
+
+        cmake.install()
+
         if self.options.include_what_you_use:
             iwyu_bin_dir = os.path.join(self._iwyu_source_subfolder, "build", "bin")
             self.output.info('copying %s into %s' % (iwyu_bin_dir, package_bin_dir))
@@ -551,9 +564,15 @@ class LLVM9Conan(ConanFile):
           '{}/libexec'.format(self.package_folder))
 
         # keep_path=True required by `/include/c++/v1/`
+        #self.copy('*', src='%s/include' % (self.build_folder), dst='include', keep_path=True)
         self.copytree( \
           '{}/include'.format(self.build_folder), \
           '{}/include'.format(self.package_folder))
+
+        clang_src_dir = os.path.join(self._llvm_source_subfolder, "clang")
+        self.copytree( \
+          '{}'.format(clang_src_dir), \
+          '{}/clang'.format(self.package_folder))
 
         # keep_path=True required by `/lib/clang/10.0.1/include/`
         self.copytree( \
@@ -566,9 +585,9 @@ class LLVM9Conan(ConanFile):
     # because it can conflict with system compiler
     # https://stackoverflow.com/q/54273632
     def package_info(self):
-        self.cpp_info.includedirs = ["include"]
-        self.cpp_info.libdirs = ["lib"]
-        self.cpp_info.bindirs = ["bin", "libexec"]
+        self.cpp_info.includedirs = ["include", "clang/include", "tools/clang/include"]
+        self.cpp_info.libdirs = ["lib", "clang/lib", "tools/clang/lib"]
+        self.cpp_info.bindirs = ["bin", "libexec", "clang/tools", "tools/clang/tools"]
         #self.env_info.LD_LIBRARY_PATH.append(
         #    os.path.join(self.package_folder, "lib"))
         #self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
