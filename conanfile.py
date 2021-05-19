@@ -150,6 +150,37 @@ class LLVM9Conan(ConanFile):
     def _iwyu_source_subfolder(self):
         return "iwyu"
 
+    @property
+    def _libcxx(self):
+      return str(self.settings.get_safe("compiler.libcxx"))
+
+    @property
+    def _has_sanitizers(self):
+      return self.options.enable_msan \
+              or self.options.enable_asan \
+              or self.options.enable_ubsan \
+              or self.options.enable_tsan
+
+    # Do not copy large files
+    # https://stackoverflow.com/a/13814557
+    def copytree(self, src, dst, symlinks=False, ignore=None, verbose=False):
+        if not os.path.exists(dst):
+            os.makedirs(dst)
+        ignore_list = ['.travis.yml', '.git', '.make', '.o', '.obj', '.marks', '.internal', 'CMakeFiles', 'CMakeCache']
+        for item in os.listdir(src):
+            if item not in ignore_list:
+              s = os.path.join(src, item)
+              d = os.path.join(dst, item)
+              if verbose:
+                self.output.info('copying %s into %d' % (s, d))
+              if os.path.isdir(s):
+                  self.copytree(s, d, symlinks, ignore)
+              else:
+                  if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
+                      shutil.copy2(s, d)
+            elif verbose:
+              self.output.info('IGNORED copying %s' % (item))
+
     def configure(self):
         compiler_version = Version(self.settings.compiler.version.value)
         if self.settings.build_type != "Release":
@@ -201,7 +232,9 @@ class LLVM9Conan(ConanFile):
         cpu_count = max(tools.cpu_count() - 3, 1)
         self.output.info('Detected %s CPUs' % (cpu_count))
 
-        # Semicolon-separated list of projects to build (clang;clang-tools-extra;compiler-rt;debuginfo-tests;libc;libclc;libcxx;libcxxabi;libunwind;lld;lldb;llgo;mlir;openmp;parallel-libs;polly;pstl), or "all".
+        # Semicolon-separated list of projects to build
+        # (clang;clang-tools-extra;compiler-rt;debuginfo-tests;libc;libclc;libcxx;libcxxabi;libunwind;lld;lldb;llgo;mlir;openmp;parallel-libs;polly;pstl),
+        # or "all".
         cmake.definitions["LLVM_ENABLE_PROJECTS"]=llvm_projects
 
         # see Building LLVM with CMake https://llvm.org/docs/CMake.html
@@ -211,6 +244,8 @@ class LLVM9Conan(ConanFile):
 
         # TODO: make customizable
         #cmake.definitions["LLVM_LINK_LLVM_DYLIB"]=1
+
+        # LLVM_DYLIB_EXPORT_ALL
 
         # TODO: make customizable
         # This should speed up building debug builds
@@ -225,12 +260,26 @@ class LLVM9Conan(ConanFile):
             # https://stackoverflow.com/a/51924150
             cmake.definitions["CMAKE_CXX_LINKER_FLAGS"]="-lncurses -ltinfo"
 
-        # Semicolon-separated list of runtimes to build (libcxx;libcxxabi;libunwind;compiler-rt), or "all".
+        # Semicolon-separated list of runtimes to build
+        # (libcxx;libcxxabi;libunwind;compiler-rt;...), or "all".
         cmake.definitions["LLVM_ENABLE_RUNTIMES"]=llvm_runtimes
 
+        # sanitizer runtimes - runtime libraries that are required
+        # to run the code with sanitizer instrumentation.
+        # This includes runtimes for:
+        # AddressSanitizer
+        # ThreadSanitizer
+        # UndefinedBehaviorSanitizer
+        # MemorySanitizer
+        # LeakSanitizer
+        # DataFlowSanitizer
+        self.output.info('llvm_sanitizer = {}'.format(llvm_sanitizer))
         if len(llvm_sanitizer) > 0:
             cmake.definitions["LLVM_USE_SANITIZER"]=llvm_sanitizer
             self.output.info('LLVM_USE_SANITIZER = {}'.format(llvm_sanitizer))
+
+            # LLVM_ENABLE_ZLIB
+            # LLVM_ENABLE_FFI
 
             # TODO: make customizable
             # see libcxx in LLVM_ENABLE_PROJECTS
@@ -250,18 +299,18 @@ class LLVM9Conan(ConanFile):
 
             # sanitizer needs only libc++ and libc++abi
             cmake.definitions["LLVM_BUILD_TOOLS"]="OFF"
-            cmake.definitions["LLVM_TOOL_CLANG_TOOLS_EXTRA_BUILD"]="OFF"
-            cmake.definitions["CLANG_ENABLE_STATIC_ANALYZER"]="OFF"
-            cmake.definitions["CLANG_TOOL_CLANG_CHECK_BUILD"]="OFF"
-            cmake.definitions["CLANG_PLUGIN_SUPPORT"]="OFF"
-            cmake.definitions["CLANG_TOOL_CLANG_FORMAT_BUILD"]="OFF"
-            cmake.definitions["CLANG_ENABLE_FORMAT"]="OFF"
-            cmake.definitions["CLANG_TOOL_CLANG_FUZZER_BUILD"]="OFF"
+            cmake.definitions["LLVM_INCLUDE_TOOLS"]="OFF"
+            #cmake.definitions["LLVM_TOOL_CLANG_TOOLS_EXTRA_BUILD"]="OFF"
+            #cmake.definitions["CLANG_ENABLE_ARCMT"]="OFF"
+            #cmake.definitions["CLANG_ENABLE_STATIC_ANALYZER"]="OFF"
+            #cmake.definitions["CLANG_ENABLE_FORMAT"]="OFF"
+            #cmake.definitions["CLANG_TOOL_CLANG_CHECK_BUILD"]="OFF"
+            #cmake.definitions["CLANG_PLUGIN_SUPPORT"]="OFF"
+            #cmake.definitions["CLANG_TOOL_CLANG_FORMAT_BUILD"]="OFF"
+            #cmake.definitions["CLANG_TOOL_CLANG_FUZZER_BUILD"]="OFF"
 
             cmake.definitions["LLVM_BUILD_RUNTIME"]="ON"
             cmake.definitions["LLVM_BUILD_RUNTIMES"]="ON"
-
-            cmake.definitions["LLVM_BUILD_UTILS"]="ON"
 
             # TODO: make customizable
             # LLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL
@@ -279,7 +328,8 @@ class LLVM9Conan(ConanFile):
             # use UNINSTRUMENTED llvm-ar, llvml-symbolizer, etc.
             cmake.definitions["LLVM_USE_SANITIZER"]=""
             cmake.definitions["LLVM_BUILD_TOOLS"]="ON"
-            cmake.definitions["LLVM_TOOL_CLANG_TOOLS_EXTRA_BUILD"]="ON"
+            cmake.definitions["LLVM_INCLUDE_TOOLS"]="ON"
+            #cmake.definitions["LLVM_TOOL_CLANG_TOOLS_EXTRA_BUILD"]="ON"
             cmake.definitions["CLANG_ENABLE_STATIC_ANALYZER"]="ON"
             cmake.definitions["CLANG_TOOL_CLANG_CHECK_BUILD"]="ON"
             cmake.definitions["CLANG_PLUGIN_SUPPORT"]="ON"
@@ -287,11 +337,36 @@ class LLVM9Conan(ConanFile):
             cmake.definitions["CLANG_ENABLE_FORMAT"]="ON"
             cmake.definitions["CLANG_TOOL_CLANG_FUZZER_BUILD"]="ON"
 
+        #cmake.definitions["LLVM_INCLUDE_UTILS"]="ON"
+        #cmake.definitions["LLVM_BUILD_UTILS"]="ON"
+        # LLVM_INSTALL_UTILS
+        # LLVM_TOOLS_INSTALL_DIR
+
         # NOTE: msan build requires
-        # existing file ~/.conan/data/llvm_9/master/conan/stable/package/.../lib/clang/10.0.1/lib/linux/libclang_rt.msan_cxx-x86_64.a
+        # existing file ~/.conan/data/.../master/conan/stable/package/.../lib/clang/x.x.x/lib/linux/libclang_rt.msan_cxx-x86_64.a
         # same for tsan\ubsan\asan\etc.
-        cmake.definitions["COMPILER_RT_BUILD_SANITIZERS"] = "ON" \
-          if len(llvm_sanitizer) > 0 else "OFF"
+        cmake.definitions["COMPILER_RT_BUILD_SANITIZERS"] = "ON"
+
+        # TODO
+        # builtins - a simple library that provides an implementation of the low-level target-specific hooks required by code generation and other runtime components. For example, when compiling for a 32-bit target, converting a double to a 64-bit unsigned integer is compiling into a runtime call to the "__fixunsdfdi" function. The builtins library provides optimized implementations of this and other low-level routines, either in target-independent C form, or as a heavily-optimized assembly.
+        # builtins provides full support for the libgcc interfaces on supported targets and high performance hand tuned implementations of commonly used functions like __floatundidf in assembly that are dramatically faster than the libgcc implementations. It should be very easy to bring builtins to support a new target by adding the new routines needed by that target.
+        cmake.definitions["COMPILER_RT_BUILD_BUILTINS"] = "OFF"
+
+        cmake.definitions["COMPILER_RT_INCLUDE_TESTS"] = "OFF"
+
+        # TODO
+        #cmake.definitions["COMPILER_RT_BUILD_LIBFUZZER"] = "ON"
+
+        # TODO
+        #cmake.definitions['COMPILER_RT_BUILD_CRT'] = 'OFF'
+        #cmake.definitions['COMPILER_RT_BUILD_XRAY'] = 'OFF'
+        # profile - library which is used to collect coverage information.
+        #cmake.definitions['COMPILER_RT_BUILD_PROFILE'] = 'OFF'
+
+        # TODO
+        #'COMPILER_RT_BAREMETAL_BUILD:BOOL': 'ON',
+        #'COMPILER_RT_DEFAULT_TARGET_ONLY': 'ON',
+        # COMPILER_RT_OS_DIR
 
         # TODO: make customizable
         #cmake.definitions["CMAKE_CXX_STANDARD"]="17"
@@ -347,19 +422,20 @@ class LLVM9Conan(ConanFile):
         cmake.definitions["LLVM_ENABLE_DOXYGEN"]="OFF"
         cmake.definitions["LLVM_ENABLE_OCAMLDOC"]="OFF"
         cmake.definitions["LLVM_ENABLE_SPHINX"]="OFF"
-        cmake.definitions["LLVM_ENABLE_RTTI"]="OFF"
+
+        #cmake.definitions["LLVM_ENABLE_RTTI"]="OFF"
         # TODO: make customizable
-        #cmake.definitions["LLVM_ENABLE_RTTI"]="ON"
+        cmake.definitions["LLVM_ENABLE_RTTI"]="ON"
 
         # Whether to build compiler-rt as part of LLVM
-        cmake.definitions["LLVM_TOOL_COMPILER_RT_BUILD"]="ON"
+        # cmake.definitions["LLVM_TOOL_COMPILER_RT_BUILD"]="ON"
 
         # TODO: make customizable
         # Whether to build gold as part of LLVM
-        cmake.definitions["LLVM_TOOL_GOLD_BUILD"]="ON"
+        #cmake.definitions["LLVM_TOOL_GOLD_BUILD"]="ON"
 
         # Whether to build libcxxabi as part of LLVM
-        cmake.definitions["LLVM_TOOL_LIBCXXABI_BUILD"]="ON"
+        #cmake.definitions["LLVM_TOOL_LIBCXXABI_BUILD"]="ON"
 
         # FIXME: No rule to make target 'projects/libc/src/math/round.o'
         # see https://github.com/fwsGonzo/libriscv/issues/4
@@ -367,14 +443,15 @@ class LLVM9Conan(ConanFile):
         #cmake.definitions["LLVM_TOOL_LIBC_BUILD"]="ON"
 
         # Whether to build libcxx as part of LLVM
-        cmake.definitions["LLVM_TOOL_LIBCXX_BUILD"]="ON"
+        #cmake.definitions["LLVM_TOOL_LIBCXX_BUILD"]="ON"
 
         # Whether to build libunwind as part of LLVM
-        cmake.definitions["LLVM_TOOL_LIBUNWIND_BUILD"]="ON"
+        #cmake.definitions["LLVM_TOOL_LIBUNWIND_BUILD"]="ON"
 
         # sanitizers to build if supported on the target (all;asan;dfsan;msan;tsan;safestack;cfi;esan;scudo)
-        cmake.definitions["COMPILER_RT_SANITIZERS_TO_BUILD"]= "asan;msan;tsan;safestack;cfi;esan" \
-          if len(llvm_sanitizer) > 0 else ""
+        #cmake.definitions["COMPILER_RT_SANITIZERS_TO_BUILD"]= "asan;msan;tsan;safestack;cfi;esan" \
+        #  if len(llvm_sanitizer) > 0 else ""
+        #self.output.info('COMPILER_RT_SANITIZERS_TO_BUILD = {}'.format(cmake.definitions["COMPILER_RT_SANITIZERS_TO_BUILD"]))
 
         # TODO: custom C++ stdlib requires custom include paths
         # Default C++ stdlib to use ("libstdc++" or "libc++", empty for platform default
@@ -412,7 +489,14 @@ class LLVM9Conan(ConanFile):
         #LLVM_TOOL_LLD_BUILD:BOOL=OFF
 
         # TODO: make customizable
+        # Use compiler-rt builtins instead of libgcc
         #COMPILER_RT_USE_BUILTINS_LIBRARY
+
+        # TODO:
+        #cmake.definitions["SANITIZER_USE_STATIC_CXX_ABI"]="ON"
+
+        # TODO:
+        #cmake.definitions["SANITIZER_USE_STATIC_LLVM_UNWINDER"]="ON"
 
         # when making a debug or asserts build speed it up by building a release tablegen
         cmake.definitions["LLVM_OPTIMIZED_TABLEGEN"]="ON"
@@ -420,7 +504,7 @@ class LLVM9Conan(ConanFile):
         # TODO
         #cmake.definitions["LLVM_ENABLE_PLUGINS"]="ON"
 
-        cmake.definitions["LLVM_ENABLE_ASSERTIONS"]="OFF"
+        #cmake.definitions["LLVM_ENABLE_ASSERTIONS"]="OFF"
 
         # The CMakeLists.txt file must be in `source_folder`
         cmake.configure(source_folder=llvm_src_dir)
@@ -437,30 +521,24 @@ class LLVM9Conan(ConanFile):
         cpu_count = max(tools.cpu_count() - 2, 1)
         self.output.info('Detected %s CPUs' % (cpu_count))
 
+        # First, we need to build compiler,
+        # than we will be able to build runtimes.
         configure_llvm_projects = "clang;clang-tools-extra;libunwind;lld;lldb;libcxx;libcxxabi;compiler-rt"
-        if self.options.enable_msan:
+        if (self._has_sanitizers):
             # we will build `libcxx;libcxxabi;compiler-rt` separately if sanitizer enabled
             configure_llvm_projects = "clang;clang-tools-extra;compiler-rt;libunwind;lld;lldb"
 
         # NOTE: builds `libcxx;libcxxabi;compiler-rt;` separately (for sanitizers support)
         cmake = self._configure_cmake(llvm_projects = configure_llvm_projects, \
-            #llvm_runtimes = "compiler-rt;libunwind" \
             llvm_runtimes = "",
         )
 
         # see https://fuchsia.googlesource.com/fuchsia/+/HEAD/docs/development/build/toolchain.md
         # -j flag for parallel builds
         cmake.build(args=["--", "-j%s" % cpu_count])
-        #cmake.build(args=["--target", "clang", "--", "-j%s" % cpu_count])
-        #cmake.build(args=["--target", "clang-tools-extra", "--", "-j%s" % cpu_count])
-        #cmake.build(args=["--target", "libunwind", "--", "-j%s" % cpu_count])
-        #cmake.build(args=["--target", "lld", "--", "-j%s" % cpu_count])
-        #cmake.build(args=["--target", "lldb", "--", "-j%s" % cpu_count])
-        #cmake.build(args=["--target", "libcxx", "--", "-j%s" % cpu_count])
-        #cmake.build(args=["--target", "libcxxabi", "--", "-j%s" % cpu_count])
-        #cmake.build(args=["--target", "compiler-rt", "--", "-j%s" % cpu_count])
         cmake.install()
 
+        llvm_sanitizer_key = ""
         # We want to enable sanitizers on `libcxx;libcxxabi;compiler-rt`,
         # but NOT on whole LLVM.
         # Sanitizer requires that all program code is instrumented.
@@ -473,7 +551,6 @@ class LLVM9Conan(ConanFile):
             # TODO: use-of-uninitialized-value in llvm-symbolizer
             llvm_sanitizer_key = "MemoryWithOrigins"
             #llvm_sanitizer_key = "Memory"
-            #llvm_sanitizer_key = ""
         elif self.options.enable_asan:
             llvm_sanitizer_key = "Address;Undefined"
         elif self.options.enable_ubsan:
@@ -481,23 +558,16 @@ class LLVM9Conan(ConanFile):
         elif self.options.enable_tsan:
             llvm_sanitizer_key = "Thread"
 
-        # required for builds with `-stdlib=libc++ -lc++abi`
-        if (self.options.enable_msan \
-            or self.options.enable_asan \
-            or self.options.enable_ubsan \
-            or self.options.enable_tsan):
-            # NOTE: builds `libcxx;libcxxabi;compiler-rt;` separately (for sanitizers support)
-            # NOTE: use uninstrumented llvm-tblgen https://stackoverflow.com/q/56454026
-            cmake = self._configure_cmake(llvm_projects = "libcxx;libcxxabi;compiler-rt", \
-                llvm_runtimes = "", \
-                llvm_sanitizer=llvm_sanitizer_key)
+        # Build runtimes separately
+        # NOTE: builds `libcxx;libcxxabi;compiler-rt;` separately (for sanitizers support)
+        # NOTE: use uninstrumented llvm-tblgen https://stackoverflow.com/q/56454026
+        cmake = self._configure_cmake(llvm_projects = "clang;clang-tools-extra;lld;lldb", \
+            llvm_runtimes = "libunwind;libcxx;libcxxabi;compiler-rt", \
+            llvm_sanitizer=llvm_sanitizer_key)
 
-            # -j flag for parallel builds
-            cmake.build(args=["--", "-j%s" % cpu_count])
-            #cmake.build(args=["--target", "libcxx", "--", "-j%s" % cpu_count])
-            #cmake.build(args=["--target", "libcxxabi", "--", "-j%s" % cpu_count])
-            #cmake.build(args=["--target", "compiler-rt", "--", "-j%s" % cpu_count])
-            cmake.install()
+        # -j flag for parallel builds
+        cmake.build(args=["--", "-j%s" % cpu_count])
+        cmake.install()
 
         # NOTE: builds before sanitized `libcxx;libcxxabi;compiler-rt;`
         if self.options.include_what_you_use:
@@ -511,42 +581,14 @@ class LLVM9Conan(ConanFile):
                     self.run('cmake --build . %s' % (cmake.build_config))
                     self.run('cmake --build . --target install')
 
-    # https://stackoverflow.com/a/13814557
-    def copytree(self, src, dst, symlinks=False, ignore=None, verbose=False):
-        if not os.path.exists(dst):
-            os.makedirs(dst)
-        ignore_list = ['.travis.yml', '.git', '.make', '.o', '.obj', '.marks', '.internal', 'CMakeFiles', 'CMakeCache']
-        for item in os.listdir(src):
-            if item not in ignore_list:
-              s = os.path.join(src, item)
-              d = os.path.join(dst, item)
-              if verbose:
-                self.output.info('copying %s into %d' % (s, d))
-              if os.path.isdir(s):
-                  self.copytree(s, d, symlinks, ignore)
-              else:
-                  if not os.path.exists(d) or os.stat(s).st_mtime - os.stat(d).st_mtime > 1:
-                      shutil.copy2(s, d)
-            elif verbose:
-              self.output.info('IGNORED copying %s' % (item))
-
     def package(self):
+        # don't hang all CPUs and force OS to kill build process
+        cpu_count = max(tools.cpu_count() - 2, 1)
+        self.output.info('Detected %s CPUs' % (cpu_count))
+
         llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
 
         package_bin_dir = os.path.join(self.package_folder, "bin")
-
-        configure_llvm_projects = "clang;clang-tools-extra;libunwind;lld;lldb;libcxx;libcxxabi;compiler-rt"
-        if self.options.enable_msan:
-            # we will build `libcxx;libcxxabi;compiler-rt` separately if sanitizer enabled
-            configure_llvm_projects = "clang;clang-tools-extra;compiler-rt;libunwind;lld;lldb"
-
-        # NOTE: builds `libcxx;libcxxabi;compiler-rt;` separately (for sanitizers support)
-        cmake = self._configure_cmake(llvm_projects = configure_llvm_projects, \
-            #llvm_runtimes = "compiler-rt;libunwind" \
-            llvm_runtimes = "",
-        )
-
-        cmake.install()
 
         if self.options.include_what_you_use:
             iwyu_bin_dir = os.path.join(self._iwyu_source_subfolder, "build", "bin")
@@ -564,7 +606,7 @@ class LLVM9Conan(ConanFile):
           '{}/libexec'.format(self.package_folder))
 
         # keep_path=True required by `/include/c++/v1/`
-        #self.copy('*', src='%s/include' % (self.build_folder), dst='include', keep_path=True)
+        self.copy('*', src='%s/include' % (self.build_folder), dst='include', keep_path=True)
         self.copytree( \
           '{}/include'.format(self.build_folder), \
           '{}/include'.format(self.package_folder))
@@ -574,7 +616,13 @@ class LLVM9Conan(ConanFile):
           '{}'.format(clang_src_dir), \
           '{}/clang'.format(self.package_folder))
 
-        # keep_path=True required by `/lib/clang/10.0.1/include/`
+        tools_src_dir = os.path.join(self.build_folder, "tools")
+        self.copytree( \
+          '{}'.format(tools_src_dir), \
+          '{}/tools'.format(self.package_folder))
+
+        # keep_path=True required by `/lib/clang/x.x.x/include/`
+        self.copy('*', src='%s/lib' % (self.build_folder), dst='lib', keep_path=True)
         self.copytree( \
           '{}/lib'.format(self.build_folder), \
           '{}/lib'.format(self.package_folder))
@@ -587,7 +635,7 @@ class LLVM9Conan(ConanFile):
     def package_info(self):
         self.cpp_info.includedirs = ["include", "clang/include", "tools/clang/include"]
         self.cpp_info.libdirs = ["lib", "clang/lib", "tools/clang/lib"]
-        self.cpp_info.bindirs = ["bin", "libexec", "clang/tools", "tools/clang/tools"]
+        self.cpp_info.bindirs = ["bin", "libexec", "clang", "tools", "tools/clang"]
         #self.env_info.LD_LIBRARY_PATH.append(
         #    os.path.join(self.package_folder, "lib"))
         #self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
@@ -596,16 +644,16 @@ class LLVM9Conan(ConanFile):
         #    self.env_info.LD_LIBRARY_PATH.append(libpath)
 
         if self.settings.os_build == "Linux":
-            self.cpp_info.libs.extend(["pthread", "m", "dl"])
-            if self.settings.compiler == "clang" and self.settings.compiler.libcxx == "libstdc++":
+            self.cpp_info.libs.extend(["pthread", "unwind", "z", "m", "dl", "ncurses", "tinfo"])
+            if self.settings.compiler == "clang" and self._libcxx == "libstdc++":
                 self.cpp_info.libs.append("atomic")
         elif self.settings.os_build == "Windows" and self.settings.compiler == "Visual Studio":
             self.cpp_info.libs.extend(["ws2_32", "Iphlpapi", "Crypt32"])
 
         if (self.settings.os_build == "Linux" and self.settings.compiler == "clang" and
-           Version(self.settings.compiler.version.value) == "6" and self.settings.compiler.libcxx == "libstdc++") or \
+           Version(self.settings.compiler.version.value) == "6" and self._libcxx == "libstdc++") or \
            (self.settings.os_build == "Macos" and self.settings.compiler == "apple-clang" and
-           Version(self.settings.compiler.version.value) == "9.0" and self.settings.compiler.libcxx == "libc++"):
+           Version(self.settings.compiler.version.value) == "9.0" and self._libcxx == "libc++"):
             self.cpp_info.libs.append("atomic")
 
         self.cpp_info.includedirs.append(os.path.join(self.package_folder, "include"))
@@ -628,8 +676,10 @@ class LLVM9Conan(ConanFile):
         self.output.info("Package folder: %s" % self.package_folder)
         self.env_info.CONAN_LLVM_9_ROOT = self.package_folder
 
-    # TODO: clang++-9 does not depend on arch,
-    # but tooling libs  depend on arch...
+    # TODO: clang++ does not depend on arch,
+    # but tooling libs depend on arch...
+    # You must use same CXX ABI as LLVM libs
+    # otherwise you will get link errors!
     def package_id(self):
         self.info.include_build_settings()
         if self.settings.os_build == "Windows":
