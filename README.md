@@ -531,6 +531,12 @@ conan export-pkg . \
   --force \
   --profile clang
 
+cmake -E time \
+  conan test test_package llvm_9/master@conan/stable \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang
+
 rm -rf local_build/package_dir
 ```
 
