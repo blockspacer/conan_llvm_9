@@ -856,6 +856,9 @@ class LLVM9Conan(ConanFile):
     def build_stage_tmp_compiler(self):
         self.output.info('stage_tmp_compiler')
 
+        if not os.path.exists(self._stage_tmp_compiler_folder):
+            os.makedirs(self._stage_tmp_compiler_folder)
+
         if not self.resolve_option("clang"):
           # clang from stage_tmp_compiler required for next stages (it will be used to compile code)
           raise ConanInvalidConfiguration("enable project clang for stage_tmp_compiler")
@@ -886,9 +889,6 @@ class LLVM9Conan(ConanFile):
         # is added from the first stage to the second ensuring
         # that lld is built before stage_runtime begins.
         # cmake.definitions["LLVM_ENABLE_LLD"]="ON"
-
-        if not os.path.exists(self._stage_tmp_compiler_folder):
-            os.makedirs(self._stage_tmp_compiler_folder)
 
         llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
         self.output.info('llvm_src_dir is {}'.format(llvm_src_dir))
@@ -940,6 +940,9 @@ class LLVM9Conan(ConanFile):
 
     def build_stage_runtime(self):
         self.output.info('stage_runtime')
+
+        if not os.path.exists(self._stage_runtime_folder):
+            os.makedirs(self._stage_runtime_folder)
 
         self.old_env = dict(os.environ)
 
@@ -996,9 +999,6 @@ class LLVM9Conan(ConanFile):
         cpu_count = max(tools.cpu_count() - 2, 1)
         self.output.info('Detected %s CPUs' % (cpu_count))
 
-        if not os.path.exists(self._stage_runtime_folder):
-            os.makedirs(self._stage_runtime_folder)
-
         llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
         self.output.info('llvm_src_dir is {}'.format(llvm_src_dir))
 
@@ -1036,6 +1036,9 @@ class LLVM9Conan(ConanFile):
     def build_stage_llvm(self):
         self.output.info('stage_llvm')
 
+        if not os.path.exists(self._stage_llvm_folder):
+            os.makedirs(self._stage_llvm_folder)
+
         # don't hang all CPUs and force OS to kill build process
         cpu_count = max(tools.cpu_count() - 2, 1)
         self.output.info('Detected %s CPUs' % (cpu_count))
@@ -1060,9 +1063,6 @@ class LLVM9Conan(ConanFile):
         # is added from the first stage to the second ensuring
         # that lld is built before stage_runtime begins.
         # cmake.definitions["LLVM_ENABLE_LLD"]="ON"
-
-        if not os.path.exists(self._stage_llvm_folder):
-            os.makedirs(self._stage_llvm_folder)
 
         llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
         self.output.info('llvm_src_dir is {}'.format(llvm_src_dir))
