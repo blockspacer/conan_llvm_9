@@ -1,10 +1,17 @@
 # About
 
-Release llvm 9.0.1
+Release for llvm 9
 
-NOTE: use `-s llvm_9:build_type=Release` during `conan install`
+NOTE: use `-s llvm_9:build_type=Release` during `conan install` or set `llvm_9:build_type=Release` in conan profile `[settings]`.
 
-conan package for llvm tools:
+Use it if you want to:
+ * use clang
+ * use clang tools (clang-format, include-what-you-use, etc.)
+ * use clang libs (libtooling, etc.)
+ * use libc++
+ * use google sanitizers (asan, msan, etc.)
+
+Features:
 
 * include-what-you-use (only if `LLVM_USE_SANITIZER` disabled)
 * clang-tidy
@@ -16,6 +23,91 @@ conan package for llvm tools:
 * libc++ (will be instrumented if `LLVM_USE_SANITIZER` enabled)
 * clang and clang++ as compilers
 * etc.
+
+## Environment variables that affect recipe
+
+`llvm_9_llvm_version` default: "llvmorg-9.0.1"
+`llvm_9_iwyu_version` default: "clang_9.0"
+`llvm_9_BUILD_NUMBER` affects conan package version
+
+A lot of LLVM options can be modified by environment variables.
+`LLVM_COMPILER_JOBS` - affects cmake definition `LLVM_COMPILER_JOBS`
+`LLVM_PARALLEL_LINK_JOBS` - affects cmake definition `LLVM_PARALLEL_LINK_JOBS`
+`LLVM_PARALLEL_COMPILE_JOBS` - affects cmake definition `LLVM_PARALLEL_COMPILE_JOBS`
+etc.
+See `os.getenv` in `conanfile.py` for full list.
+
+## Conan options that affect recipe
+
+`with_LLVMCore`, `with_LLVMAnalysis`,
+etc. used to set link libraries (in `self.cpp_info.libs`).
+See `llvm_libs` in `conanfile.py` for full list.
+
+`with_X86`, `with_ARM`,
+etc. used to set targets (in `LLVM_TARGETS_TO_BUILD`).
+See `llvm_targets` in `conanfile.py` for full list.
+
+`with_clang`, `with_clang-tools-extra`, `with_compiler-rt`,
+etc. used to set projects (in `LLVM_ENABLE_PROJECTS`).
+See `llvm_projects` in `conanfile.py` for full list.
+
+Build settings: 'fPIC', 'shared', 'rtti', 'libffi', 'libz', 'lto', etc.
+
+IWYU support: "include_what_you_use"
+
+Sanitizers support: use_sanitizer
+
+See `self.options` in `conanfile.py` for full list.
+
+## Supported platforms
+
+Tested on Ubuntu 18, x86_64.
+
+```bash
+# lsb_release -a
+Distributor ID: Ubuntu
+Description:    Ubuntu 18.04.2 LTS
+Release:        18.04
+Codename:       bionic
+
+# uname -a
+Linux username 4.15.0-96-generic #97-Ubuntu SMP Wed Apr 1 03:25:46 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux
+```
+
+## LICENSE
+
+MIT for conan package. Packaged source uses own license, see https://releases.llvm.org/2.8/LICENSE.TXT and https://github.com/root-project/root/blob/master/LICENSE
+
+## Best practices
+
+`CONAN_DISABLE_CHECK_COMPILER` is bad practice.
+
+Use approach similar to https://github.com/blockspacer/llvm_9_installer
+
+Best practice is to create separate recipe that depends on llvm package and populate env. vars.
+
+```python
+  # see https://docs.conan.io/en/latest/systems_cross_building/cross_building.html
+  self.env_info.CXX = os.path.join(llvm_root, "bin", "clang++")
+  self.env_info.CC = os.path.join(llvm_root, "bin", "clang")
+  self.env_info.AR = os.path.join(llvm_root, "bin", "llvm-ar")
+  self.env_info.STRIP = os.path.join(llvm_root, "bin", "llvm-strip")
+  self.env_info.LD = os.path.join(llvm_root, "bin", "ld.lld") # llvm-ld replaced by llvm-ld
+  self.env_info.NM = os.path.join(llvm_root, "bin", "llvm-nm")
+  # TODO: propagate to CMAKE_OBJDUMP?
+  self.env_info.OBJDUMP = os.path.join(llvm_root, "bin", "llvm-objdump")
+  self.env_info.SYMBOLIZER = os.path.join(llvm_root, "bin", "llvm-symbolizer")
+  self.env_info.RANLIB = os.path.join(llvm_root, "bin", "llvm-ranlib")
+  self.env_info.AS = os.path.join(llvm_root, "bin", "llvm-as")
+  # TODO: llvm-rc-rc or llvm-rc?
+  self.env_info.RC = os.path.join(llvm_root, "bin", "llvm-rc")
+```
+
+Or better, just use https://github.com/blockspacer/llvm_9_installer
+
+## Usage example (CMake)
+
+See [https://github.com/include-what-you-use/include-what-you-use/issues/802#issuecomment-661058223](https://github.com/include-what-you-use/include-what-you-use/issues/802#issuecomment-661058223)
 
 See `test_package/CMakeLists.txt` for usage example
 
@@ -234,54 +326,6 @@ You can use `libc++` from conan package like so:
 
 See for example `macro(compile_with_llvm_9)` from [https://github.com/blockspacer/cmake_helper_utils_conan/blob/master/cmake/Findcmake_helper_utils.cmake](https://github.com/blockspacer/cmake_helper_utils_conan/blob/master/cmake/Findcmake_helper_utils.cmake)
 
-## Supported platforms
-
-Tested on Ubuntu 18, x86_64.
-
-```bash
-# lsb_release -a
-Distributor ID: Ubuntu
-Description:    Ubuntu 18.04.2 LTS
-Release:        18.04
-Codename:       bionic
-
-# uname -a
-Linux username 4.15.0-96-generic #97-Ubuntu SMP Wed Apr 1 03:25:46 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux
-```
-
-## LICENSE
-
-MIT for conan package. Packaged source uses own license, see https://releases.llvm.org/2.8/LICENSE.TXT and https://github.com/root-project/root/blob/master/LICENSE
-
-## Usage example (CMake)
-
-See [https://github.com/include-what-you-use/include-what-you-use/issues/802#issuecomment-661058223](https://github.com/include-what-you-use/include-what-you-use/issues/802#issuecomment-661058223)
-
-## Best practices
-
-`CONAN_DISABLE_CHECK_COMPILER` is bad practice.
-
-Use approach similar to https://github.com/blockspacer/llvm_9_installer
-
-Best practice is to create separate recipe that depends on llvm package and populate env. vars.
-
-```python
-  # see https://docs.conan.io/en/latest/systems_cross_building/cross_building.html
-  self.env_info.CXX = os.path.join(llvm_root, "bin", "clang++")
-  self.env_info.CC = os.path.join(llvm_root, "bin", "clang")
-  self.env_info.AR = os.path.join(llvm_root, "bin", "llvm-ar")
-  self.env_info.STRIP = os.path.join(llvm_root, "bin", "llvm-strip")
-  self.env_info.LD = os.path.join(llvm_root, "bin", "ld.lld") # llvm-ld replaced by llvm-ld
-  self.env_info.NM = os.path.join(llvm_root, "bin", "llvm-nm")
-  # TODO: propagate to CMAKE_OBJDUMP?
-  self.env_info.OBJDUMP = os.path.join(llvm_root, "bin", "llvm-objdump")
-  self.env_info.SYMBOLIZER = os.path.join(llvm_root, "bin", "llvm-symbolizer")
-  self.env_info.RANLIB = os.path.join(llvm_root, "bin", "llvm-ranlib")
-  self.env_info.AS = os.path.join(llvm_root, "bin", "llvm-as")
-  # TODO: llvm-rc-rc or llvm-rc?
-  self.env_info.RC = os.path.join(llvm_root, "bin", "llvm-rc")
-```
-
 ## Before build
 
 Based on https://lldb.llvm.org/resources/build.html
@@ -315,7 +359,7 @@ read https://llvm.org/docs/CMake.html and https://fuchsia.dev/fuchsia-src/develo
 
 Bugfix for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=92247
 
-Fixes `asm/errno.h: No such file or directory` or `‘__NR_open’ was not declared in this scope`
+Fixes `asm/errno.h: No such file or directory` or ... `was not declared in this scope`
 
 ```bash
 sudo apt install linux-libc-dev
@@ -339,20 +383,17 @@ Or you can remove `test_target_arch(i386 __i386__ "-m32")` from `compiler-rt/cma
 ## Local build
 
 ```bash
-export CC=gcc
-export CXX=g++
-
 # https://www.pclinuxos.com/forum/index.php?topic=129566.0
 # export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
 
-# If compilation of LLVM fails on your machine (`make` may be killed by OS due to lack of RAM e.t.c.)
-# - set env. var. CONAN_LLVM_SINGLE_THREAD_BUILD to 1.
-export CONAN_LLVM_SINGLE_THREAD_BUILD=1
 export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
 export GIT_SSL_NO_VERIFY=true
+
+export CC=gcc
+export CXX=g++
 
 $CC --version
 $CXX --version
@@ -376,23 +417,20 @@ conan upload $PKG_NAME --all -r=conan-local -c --retry 3 --retry-wait 10 --force
 
 ## Build with sanitizers support
 
-Use `-o llvm_9:enable_msan=True` like so:
+Use `-o llvm_9:use_sanitizer="Address;Undefined"` like so:
 
 ```bash
-export CC=gcc
-export CXX=g++
-
 # https://www.pclinuxos.com/forum/index.php?topic=129566.0
 # export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
 
-# If compilation of LLVM fails on your machine (`make` may be killed by OS due to lack of RAM e.t.c.)
-# - set env. var. CONAN_LLVM_SINGLE_THREAD_BUILD to 1.
-export CONAN_LLVM_SINGLE_THREAD_BUILD=1
 export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
 export GIT_SSL_NO_VERIFY=true
+
+export CC=gcc
+export CXX=g++
 
 $CC --version
 $CXX --version
@@ -406,7 +444,7 @@ conan create . conan/stable \
   -s build_type=Release \
   --profile clang \
   -o llvm_9:include_what_you_use=False \
-  -o llvm_9:enable_msan=True
+  -o llvm_9:use_sanitizer="Address;Undefined"
 ```
 
 NOTE: msan requires to set `-stdlib=libc++ -lc++abi` and use include and lib paths from conan package (see above). See https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo#instrumented-gtest
@@ -472,20 +510,17 @@ You can test that sanitizer can catch error by adding into `SalutationTest` from
 NOTE: options below disable both IWYU and sanitizers (but clang compiler, llvm libs, scan-build, clang-tidy, clang-format, etc. will be enabled).
 
 ```bash
-export CC=gcc
-export CXX=g++
-
 # https://www.pclinuxos.com/forum/index.php?topic=129566.0
 # export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
 
-# If compilation of LLVM fails on your machine (`make` may be killed by OS due to lack of RAM e.t.c.)
-# - set env. var. CONAN_LLVM_SINGLE_THREAD_BUILD to 1.
-export CONAN_LLVM_SINGLE_THREAD_BUILD=1
 export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
 export GIT_SSL_NO_VERIFY=true
+
+export CC=gcc
+export CXX=g++
 
 $CC --version
 $CXX --version
@@ -543,20 +578,17 @@ rm -rf local_build/package_dir
 ## Build locally (revision with include_what_you_use enabled):
 
 ```bash
-export CC=gcc
-export CXX=g++
-
 # https://www.pclinuxos.com/forum/index.php?topic=129566.0
 # export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
 
-# If compilation of LLVM fails on your machine (`make` may be killed by OS due to lack of RAM e.t.c.)
-# - set env. var. CONAN_LLVM_SINGLE_THREAD_BUILD to 1.
-export CONAN_LLVM_SINGLE_THREAD_BUILD=1
 export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
 export GIT_SSL_NO_VERIFY=true
+
+export CC=gcc
+export CXX=g++
 
 $CC --version
 $CXX --version
@@ -614,104 +646,20 @@ cmake -E time \
 rm -rf local_build_iwyu/package_dir
 ```
 
-## Build locally (revision with msan enabled):
-
-```bash
-export CC=gcc
-export CXX=g++
-
-# https://www.pclinuxos.com/forum/index.php?topic=129566.0
-# export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
-
-# If compilation of LLVM fails on your machine (`make` may be killed by OS due to lack of RAM e.t.c.)
-# - set env. var. CONAN_LLVM_SINGLE_THREAD_BUILD to 1.
-export CONAN_LLVM_SINGLE_THREAD_BUILD=1
-export CONAN_REVISIONS_ENABLED=1
-export CONAN_VERBOSE_TRACEBACK=1
-export CONAN_PRINT_RUN_COMMANDS=1
-export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
-
-$CC --version
-$CXX --version
-
-# see BUGFIX (i386 instead of x86_64)
-export CXXFLAGS=-m64
-export CFLAGS=-m64
-export LDFLAGS=-m64
-
-rm -rf local_build_msan
-
-cmake -E time \
-  conan install . \
-  --install-folder local_build_msan \
-  -s build_type=Release \
-  -s llvm_9:build_type=Release \
-  --profile clang \
-    -o llvm_9:include_what_you_use=False \
-    -o llvm_9:enable_msan=True
-
-cmake -E time \
-  conan source . \
-  --source-folder local_build_msan \
-  --install-folder local_build_msan
-
-conan build . \
-  --build-folder local_build_msan \
-  --source-folder local_build_msan \
-  --install-folder local_build_msan
-
-# remove before `conan export-pkg`
-(CONAN_REVISIONS_ENABLED=1 \
-    conan remove --force llvm_9 || true)
-
-conan package . \
-  --build-folder local_build_msan \
-  --package-folder local_build_msan/package_dir \
-  --source-folder local_build_msan \
-  --install-folder local_build_msan
-
-conan export-pkg . \
-  conan/stable \
-  --package-folder local_build_msan/package_dir \
-  --settings build_type=Release \
-  --force \
-  --profile clang \
-    -o llvm_9:include_what_you_use=False \
-    -o llvm_9:enable_msan=True
-
-cmake -E time \
-  conan test test_package llvm_9/master@conan/stable \
-  -s build_type=Release \
-  -s llvm_9:build_type=Release \
-  --profile clang \
-      -o llvm_9:include_what_you_use=False \
-      -o llvm_9:enable_msan=True
-
-# llvm-ar, llvm-symbolizer, etc. must be NOT sanitized,
-# but libc++, libc++abi, compiler-rt must be sanitized
-nm -an local_build_msan/bin/llvm-ar | grep msan
-
-rm -rf local_build_msan/package_dir
-```
-
 ## Build locally (revision with asan enabled):
 
 ```bash
-export CC=gcc
-export CXX=g++
-
 # https://www.pclinuxos.com/forum/index.php?topic=129566.0
 # export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
 
-# If compilation of LLVM fails on your machine (`make` may be killed by OS due to lack of RAM e.t.c.)
-# - set env. var. CONAN_LLVM_SINGLE_THREAD_BUILD to 1.
-export CONAN_LLVM_SINGLE_THREAD_BUILD=1
 export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
 export GIT_SSL_NO_VERIFY=true
+
+export CC=gcc
+export CXX=g++
 
 $CC --version
 $CXX --version
@@ -730,7 +678,7 @@ cmake -E time \
   -s llvm_9:build_type=Release \
   --profile clang \
     -o llvm_9:include_what_you_use=False \
-    -o llvm_9:enable_asan=True
+    -o llvm_9:use_sanitizer="Address;Undefined"
 
 cmake -E time \
   conan source . \
@@ -759,7 +707,7 @@ conan export-pkg . \
   --force \
   --profile clang \
     -o llvm_9:include_what_you_use=False \
-    -o llvm_9:enable_asan=True
+    -o llvm_9:use_sanitizer="Address;Undefined"
 
 cmake -E time \
   conan test test_package llvm_9/master@conan/stable \
@@ -767,175 +715,21 @@ cmake -E time \
   -s llvm_9:build_type=Release \
   --profile clang \
       -o llvm_9:include_what_you_use=False \
-      -o llvm_9:enable_asan=True
+    -o llvm_9:use_sanitizer="Address;Undefined"
 
-# llvm-ar, llvm-symbolizer, etc. must be NOT sanitized,
-# but libc++, libc++abi, compiler-rt must be sanitized
-nm -an local_build_asan/bin/llvm-ar | grep asan
+# llvm-ar, llvm-symbolizer, etc. must be NOT sanitized
+nm -an local_build_asan/package_dir/bin/llvm-ar | grep asan
+
+# must be NOT sanitized
+nm -an  local_build_asan/package_dir/lib/libclangTooling.so | grep san
+
+# libc++, libc++abi must be sanitized
+nm -an  local_build_asan/package_dir/lib/libc++abi.so | grep san
+
+# must exist
+find local_build_asan/package_dir/lib/clang/ -name "*clang_rt.*san*"
 
 rm -rf local_build_asan/package_dir
-```
-
-## Build locally (revision with tsan enabled):
-
-```bash
-export CC=gcc
-export CXX=g++
-
-# https://www.pclinuxos.com/forum/index.php?topic=129566.0
-# export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
-
-# If compilation of LLVM fails on your machine (`make` may be killed by OS due to lack of RAM e.t.c.)
-# - set env. var. CONAN_LLVM_SINGLE_THREAD_BUILD to 1.
-export CONAN_LLVM_SINGLE_THREAD_BUILD=1
-export CONAN_REVISIONS_ENABLED=1
-export CONAN_VERBOSE_TRACEBACK=1
-export CONAN_PRINT_RUN_COMMANDS=1
-export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
-
-$CC --version
-$CXX --version
-
-# see BUGFIX (i386 instead of x86_64)
-export CXXFLAGS=-m64
-export CFLAGS=-m64
-export LDFLAGS=-m64
-
-rm -rf local_build_tsan
-
-cmake -E time \
-  conan install . \
-  --install-folder local_build_tsan \
-  -s build_type=Release \
-  -s llvm_9:build_type=Release \
-  --profile clang \
-    -o llvm_9:include_what_you_use=False \
-    -o llvm_9:enable_tsan=True
-
-cmake -E time \
-  conan source . \
-  --source-folder local_build_tsan \
-  --install-folder local_build_tsan
-
-conan build . \
-  --build-folder local_build_tsan \
-  --source-folder local_build_tsan \
-  --install-folder local_build_tsan
-
-# remove before `conan export-pkg`
-(CONAN_REVISIONS_ENABLED=1 \
-    conan remove --force llvm_9 || true)
-
-conan package . \
-  --build-folder local_build_tsan \
-  --package-folder local_build_tsan/package_dir \
-  --source-folder local_build_tsan \
-  --install-folder local_build_tsan
-
-conan export-pkg . \
-  conan/stable \
-  --package-folder local_build_tsan/package_dir \
-  --settings build_type=Release \
-  --force \
-  --profile clang \
-    -o llvm_9:include_what_you_use=False \
-    -o llvm_9:enable_tsan=True
-
-cmake -E time \
-  conan test test_package llvm_9/master@conan/stable \
-  -s build_type=Release \
-  -s llvm_9:build_type=Release \
-  --profile clang \
-      -o llvm_9:include_what_you_use=False \
-      -o llvm_9:enable_tsan=True
-
-# llvm-ar, llvm-symbolizer, etc. must be NOT sanitized,
-# but libc++, libc++abi, compiler-rt must be sanitized
-nm -an local_build_tsan/bin/llvm-ar | grep tsan
-
-rm -rf local_build_tsan/package_dir
-```
-
-## Build locally (revision with ubsan enabled):
-
-```bash
-export CC=gcc
-export CXX=g++
-
-# https://www.pclinuxos.com/forum/index.php?topic=129566.0
-# export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
-
-# If compilation of LLVM fails on your machine (`make` may be killed by OS due to lack of RAM e.t.c.)
-# - set env. var. CONAN_LLVM_SINGLE_THREAD_BUILD to 1.
-export CONAN_LLVM_SINGLE_THREAD_BUILD=1
-export CONAN_REVISIONS_ENABLED=1
-export CONAN_VERBOSE_TRACEBACK=1
-export CONAN_PRINT_RUN_COMMANDS=1
-export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
-
-$CC --version
-$CXX --version
-
-# see BUGFIX (i386 instead of x86_64)
-export CXXFLAGS=-m64
-export CFLAGS=-m64
-export LDFLAGS=-m64
-
-rm -rf local_build_ubsan
-
-cmake -E time \
-  conan install . \
-  --install-folder local_build_ubsan \
-  -s build_type=Release \
-  -s llvm_9:build_type=Release \
-  --profile clang \
-    -o llvm_9:include_what_you_use=False \
-    -o llvm_9:enable_ubsan=True
-
-cmake -E time \
-  conan source . \
-  --source-folder local_build_ubsan \
-  --install-folder local_build_ubsan
-
-conan build . \
-  --build-folder local_build_ubsan \
-  --source-folder local_build_ubsan \
-  --install-folder local_build_ubsan
-
-# remove before `conan export-pkg`
-(CONAN_REVISIONS_ENABLED=1 \
-    conan remove --force llvm_9 || true)
-
-conan package . \
-  --build-folder local_build_ubsan \
-  --package-folder local_build_ubsan/package_dir \
-  --source-folder local_build_ubsan \
-  --install-folder local_build_ubsan
-
-conan export-pkg . \
-  conan/stable \
-  --package-folder local_build_ubsan/package_dir \
-  --settings build_type=Release \
-  --force \
-  --profile clang \
-    -o llvm_9:include_what_you_use=False \
-    -o llvm_9:enable_ubsan=True
-
-cmake -E time \
-  conan test test_package llvm_9/master@conan/stable \
-  -s build_type=Release \
-  -s llvm_9:build_type=Release \
-  --profile clang \
-      -o llvm_9:include_what_you_use=False \
-      -o llvm_9:enable_ubsan=True
-
-# llvm-ar, llvm-symbolizer, etc. must be NOT sanitized,
-# but libc++, libc++abi, compiler-rt must be sanitized
-nm -an local_build_ubsan/bin/llvm-ar | grep ubsan
-
-rm -rf local_build_ubsan/package_dir
 ```
 
 ## FIXME: No rule to make target 'projects/libc/src/math/round.o'
