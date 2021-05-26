@@ -26,7 +26,7 @@ Features:
 
 ## Environment variables that affect recipe
 
-`llvm_9_llvm_version` default: "llvmorg-9.0.1"
+`llvm_9_llvm_version` default: "llvmorg-9.0.0"
 `llvm_9_iwyu_version` default: "clang_9.0"
 `llvm_9_BUILD_NUMBER` affects conan package version
 
@@ -50,6 +50,8 @@ See `llvm_targets` in `conanfile.py` for full list.
 `with_clang`, `with_clang-tools-extra`, `with_compiler-rt`,
 etc. used to set projects (in `LLVM_ENABLE_PROJECTS`).
 See `llvm_projects` in `conanfile.py` for full list.
+
+`link_with_llvm_libs` - enable if you want to use LLVM libs i.e. LibTooling, LLVMCore, etc.
 
 Build settings: 'fPIC', 'shared', 'rtti', 'libffi', 'libz', 'lto', etc.
 
@@ -714,7 +716,7 @@ cmake -E time \
   -s build_type=Release \
   -s llvm_9:build_type=Release \
   --profile clang \
-      -o llvm_9:include_what_you_use=False \
+    -o llvm_9:include_what_you_use=False \
     -o llvm_9:use_sanitizer="Address;Undefined"
 
 # llvm-ar, llvm-symbolizer, etc. must be NOT sanitized

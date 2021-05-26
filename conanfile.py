@@ -1,5 +1,5 @@
 import os, re, stat, fnmatch, platform, glob, traceback, shutil
-from conans import ConanFile, CMake, tools
+from conans import ConanFile, CMake, tools, RunEnvironment
 from conans.tools import Version
 from conans.errors import ConanInvalidConfiguration
 from conans.model.version import Version
@@ -177,7 +177,7 @@ llvm_env = {
   #
   # Build crtbegin.o/crtend.o
   # NOTE: OFF by default due to
-  # stage_runtime/lib/clang/9.0.1/lib/linux/clang_rt.crtbegin-x86_64.o
+  # stage_runtime/lib/clang/9.0.0/lib/linux/clang_rt.crtbegin-x86_64.o
   # that requires clang by clang_rt.crtbegin-x86_64.o
   "COMPILER_RT_BUILD_CRT": False,
   #
@@ -365,7 +365,7 @@ def get_branch(name, env_name, branch):
 
 # stage_tmp_compiler - build compiler with static link to re-build other code, without install step
 # (optional) build IWYU, before LLVM_USE_SANITIZER enabled
-# stage_runtime - build "libcxx", "libcxxabi", "compiler-rt".
+# stage_runtime - build "libcxx", "libcxxabi".
 # If LLVM_USE_SANITIZER enabled, than libcxx and libcxxabi will be sanitized.
 # stage_llvm - build all code without "libcxx", "libcxxabi".
 # Re-build "compiler-rt" (but keep libclang_rt.*san*.so).
@@ -390,7 +390,7 @@ class LLVM9Conan(ConanFile):
 
     version = get_version(name, "master")
 
-    llvm_version = get_branch(name, "llvm_version", "llvmorg-9.0.1")
+    llvm_version = get_branch(name, "llvm_version", "release/9.x")
     iwyu_version = get_branch(name, "iwyu_version", "clang_9.0")
 
     description = 'The LLVM Project is a collection of modular and reusable compiler and toolchain technologies'
@@ -451,7 +451,10 @@ class LLVM9Conan(ConanFile):
         # Enable building with zlib to support compression/uncompression in LLVM tools.
         # Defaults to ON.
         'libz': [True, False],
-        "include_what_you_use": [True, False]
+        "include_what_you_use": [True, False],
+        # If `True` than will add 'LLVMCore', 'LLVMAnalysis', 'LLVMSupport',
+        # 'clangAST', 'clangTooling', etc. into `self.cpp_info.libs`
+        "link_with_llvm_libs": [True, False]
     }}
 
     default_options = {
@@ -472,7 +475,8 @@ class LLVM9Conan(ConanFile):
         'libffi': False,
         'libz': True,
         'lto': 'Off',
-        "include_what_you_use": True
+        "include_what_you_use": True,
+        "link_with_llvm_libs": False
     }}
 
     exports = ["LICENSE.md"]
@@ -488,7 +492,7 @@ class LLVM9Conan(ConanFile):
 
     @property
     def _clang_ver(self):
-        return "9.0.1"
+        return "9.0.0"
 
     @property
     def _llvm_source_subfolder(self):
@@ -509,6 +513,13 @@ class LLVM9Conan(ConanFile):
     @property
     def _lower_build_type(self):
       return str(self.settings.build_type).lower()
+
+    @property
+    def _fit_cpu_count(self):
+      # don't hang all CPUs and force OS to kill build process
+      cpu_count = max(tools.cpu_count() - 2, 1)
+      self.output.info('Detected %s CPUs' % (cpu_count))
+      return cpu_count
 
     # TODO: failed to change compiler
     # llvm-ar: warning: creating t.a
@@ -561,14 +572,7 @@ class LLVM9Conan(ConanFile):
     # -> we build sanitized libLLVMDemangle -> clang must be sanitized too.
     # (or link statically to avoid issues)
     def project_allowed_on_stage_runtime(self, project):
-      arr = ["libcxx", "libcxxabi", "compiler-rt"]
-      if llvm_env["COMPILER_RT_BUILD_CRT"]:
-        # clang required due to stage_runtime/lib/clang/9.0.1/lib/linux/clang_rt.crtbegin-x86_64.o
-        # by clang_rt.crtbegin-x86_64.o
-        arr.extend(["clang"]) # TODO: point to external, not sanitized clang
-        if not self.resolve_option("clang"):
-          # clang from stage_tmp_compiler required for next stages (it will be used to compile code)
-          raise ConanInvalidConfiguration("enable project clang required by COMPILER_RT_BUILD_CRT")
+      arr = ["libcxx", "libcxxabi"]
       return project in arr
 
     def runtime_allowed_on_stage_runtime(self, project):
@@ -773,9 +777,9 @@ class LLVM9Conan(ConanFile):
         # cflags.append("-isystem{}/include/c++/v1".format(self._stage_tmp_compiler_folder))
         # #cflags.append("-cxx-isystem{}/include/c++/v1".format(self._stage_tmp_compiler_folder))
         # #cflags.append("-isystem{}/projects/libcxx/include".format(self._stage_tmp_compiler_folder))
-        # cflags.append("-isystem{}/lib/clang/9.0.1/include".format(self._stage_tmp_compiler_folder))
+        # cflags.append("-isystem{}/lib/clang/9.0.0/include".format(self._stage_tmp_compiler_folder))
         # cflags.append("-isystem{}/include".format(self._stage_tmp_compiler_folder))
-        # cflags.append("-resource-dir {}/lib/clang/9.0.1".format(self._stage_tmp_compiler_folder))
+        # cflags.append("-resource-dir {}/lib/clang/9.0.0".format(self._stage_tmp_compiler_folder))
         # cflags.append("-L\"{}/lib\"".format(self._stage_tmp_compiler_folder))
         # cflags.append("-Wl,-rpath,{}/lib".format(self._stage_tmp_compiler_folder))
         # # -stdlib=libc++ is a Clang (not GCC) option
@@ -821,7 +825,7 @@ class LLVM9Conan(ConanFile):
         # ldflags.append("-fuse-ld=lld")
         # #ldflags.append("-L{}/projects/libcxx/lib".format(self._stage_tmp_compiler_folder))
         # ldflags.append("-L{}/lib".format(self._stage_tmp_compiler_folder))
-        # ldflags.append("-resource-dir {}/lib/clang/9.0.1".format(self._stage_tmp_compiler_folder))
+        # ldflags.append("-resource-dir {}/lib/clang/9.0.0".format(self._stage_tmp_compiler_folder))
         # ldflags.append("-Wl,-rpath,{}/lib".format(self._stage_tmp_compiler_folder))
         # for item in ldflags:
         #   self.prepend_to_definition(cmake, "CMAKE_EXE_LINKER_FLAGS", item)
@@ -863,10 +867,6 @@ class LLVM9Conan(ConanFile):
           # clang from stage_tmp_compiler required for next stages (it will be used to compile code)
           raise ConanInvalidConfiguration("enable project clang for stage_tmp_compiler")
 
-        # don't hang all CPUs and force OS to kill build process
-        cpu_count = max(tools.cpu_count() - 2, 1)
-        self.output.info('Detected %s CPUs' % (cpu_count))
-
         # useful if you run `conan build` multiple times during development
         if os.path.exists("CMakeCache.txt"):
           os.remove("CMakeCache.txt")
@@ -892,12 +892,13 @@ class LLVM9Conan(ConanFile):
 
         llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
         self.output.info('llvm_src_dir is {}'.format(llvm_src_dir))
+
         # The CMakeLists.txt file must be in `source_folder`
         cmake.configure(source_folder=llvm_src_dir, build_folder=self._stage_tmp_compiler_folder)
 
         # see https://fuchsia.googlesource.com/fuchsia/+/HEAD/docs/development/build/toolchain.md
         # -j flag for parallel builds
-        cmake.build(args=["--", "-j%s" % cpu_count])
+        cmake.build(args=["--", "-j%s" % self._fit_cpu_count])
 
         # NOTE: No install for stage_tmp_compiler
         # cmake.install()
@@ -907,36 +908,98 @@ class LLVM9Conan(ConanFile):
         if not os.path.exists(llvm_clang):
             raise Exception("ERROR: Unable to find path: {}".format(llvm_clang))
 
+    # NOTE: iwyu version must match LLVM and clang headers version
+    # NOTE: iwyu depends on LLVM libs i.e. LLVMCore, LLVMSupport, etc.
+    # NOTE: iwyu depends on clang libs i.e. clangFrontend, clangSerialization, etc.
     def build_iwyu(self):
         self.output.info('stage iwyu')
+
+        if not self.options.include_what_you_use:
+          return
+
+        if not os.path.exists(self._stage_llvm_folder):
+          raise Exception("ERROR: Unable to find path: {}".format(self._stage_llvm_folder))
 
         if not os.path.exists(self._iwyu_folder):
             os.makedirs(self._iwyu_folder)
 
-        # NOTE: builds before sanitized `libcxx;libcxxabi;compiler-rt;`
-        if self.options.include_what_you_use:
-            # Using the helper attributes cmake.command_line and cmake.build_config
-            # because cmake.definitions["CMAKE_PREFIX_PATH"] failed
-            with tools.chdir(self._iwyu_source_subfolder):
-                cmake = CMake(self)
-                # cmake.command_line - Arguments and flags calculated by
-                # the build helper that will be applied.
-                # It indicates the generator, the Conan definitions
-                # and the flags converted from the specified Conan settings.
-                # For example:
-                # -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ... -DCONAN_C_FLAGS=-m64 -Wno-dev
-                self.run("cmake -B build -S . %s -DCMAKE_PREFIX_PATH=%s -DIWYU_LLVM_ROOT_PATH=%s" %
-                                (cmake.command_line, self._iwyu_folder, self._stage_llvm_folder))
-                with tools.chdir('build'):
-                    # cmake.build_config - Value for --config option
-                    # for Multi-configuration IDEs.
-                    # This flag will only be set
-                    # if the generator is_multi_configuration
-                    # and build_type was not forced in constructor class.
-                    # An example of the value of this property could be:
-                    # --config Release
-                    self.run('cmake --build . %s' % (cmake.build_config))
-                    self.run('cmake --build . --target install')
+        # with tools.chdir(self._iwyu_source_subfolder):
+
+        # useful if you run `conan build` multiple times during development
+        if os.path.exists("CMakeCache.txt"):
+          os.remove("CMakeCache.txt")
+          self.output.info("removed CMakeCache.txt")
+
+        #extraenv = RunEnvironment(self).vars
+
+        #if 'clang' in str(self.settings.compiler):
+        #  extraenv["CFLAGS"] = "-Wno-everything " \
+        #    + extraenv["CFLAGS"] if "CFLAGS" in extraenv else ""
+        #  extraenv["CXXFLAGS"] = "-Wno-everything " \
+        #    + extraenv["CXXFLAGS"] if "CXXFLAGS" in extraenv else ""
+
+        #with tools.environment_append(extraenv):
+
+        cmake = CMake(self, set_cmake_flags=True)
+        cmake.verbose = True
+
+        if self._stage_tmp_compiler_enabled:
+          self.use_stage_tmp_compiler_compiler(cmake)
+
+        # see lld in LLVM_ENABLE_PROJECTS
+        # This option is equivalent to -DLLVM_USE_LINKER=lld,
+        # except during a 2-stage build where a dependency
+        # is added from the first stage to the second ensuring
+        # that lld is built before stage_runtime begins.
+        # cmake.definitions["LLVM_ENABLE_LLD"]="ON"
+
+        # llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
+        # self.output.info('llvm_src_dir is {}'.format(llvm_src_dir))
+
+        cmake.definitions["IWYU_LLVM_ROOT_PATH"]=self._stage_llvm_folder
+        # NOTE: LLVM_PATH is deprecated in master
+        cmake.definitions["LLVM_PATH"]=self._stage_llvm_folder
+        cmake.definitions["IWYU_LLVM_INCLUDE_PATH"]="{}/include".format(self._stage_llvm_folder)
+        cmake.definitions["IWYU_LLVM_LIB_PATH"]="{}/lib".format(self._stage_llvm_folder)
+
+        # must exist: ${CMAKE_PREFIX_PATH}/lib/clang/${llvm_ver}/include
+        cmake.definitions["CMAKE_PREFIX_PATH"]=self._stage_llvm_folder
+
+        # must exist: ${CMAKE_BINARY_DIR}/lib/clang/${llvm_ver}/include
+        cmake.definitions["CMAKE_BINARY_DIR"]=self._stage_llvm_folder
+
+        # must find LLVMConfig.cmake
+        cmake.definitions["CMAKE_MODULE_PATH"]="{}/cmake".format(self._stage_llvm_folder)
+
+        # The CMakeLists.txt file must be in `source_folder`
+        cmake.configure(source_folder=self._iwyu_source_subfolder, build_folder=self._iwyu_folder)
+
+        # see https://fuchsia.googlesource.com/fuchsia/+/HEAD/docs/development/build/toolchain.md
+        # -j flag for parallel builds
+        cmake.build(args=["--", "-j%s" % self._fit_cpu_count])
+        cmake.install()
+
+        # Using the helper attributes cmake.command_line and cmake.build_config
+        # because cmake.definitions["CMAKE_PREFIX_PATH"] failed
+        # cmake = CMake(self)
+        # # cmake.command_line - Arguments and flags calculated by
+        # # the build helper that will be applied.
+        # # It indicates the generator, the Conan definitions
+        # # and the flags converted from the specified Conan settings.
+        # # For example:
+        # # -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ... -DCONAN_C_FLAGS=-m64 -Wno-dev
+        # self.run("cmake -B build -S . %s -DCMAKE_PREFIX_PATH=%s -DIWYU_LLVM_ROOT_PATH=%s" %
+        #                 (cmake.command_line, self._iwyu_folder, self._stage_llvm_folder))
+        # with tools.chdir('build'):
+        #     # cmake.build_config - Value for --config option
+        #     # for Multi-configuration IDEs.
+        #     # This flag will only be set
+        #     # if the generator is_multi_configuration
+        #     # and build_type was not forced in constructor class.
+        #     # An example of the value of this property could be:
+        #     # --config Release
+        #     self.run('cmake --build . %s' % (cmake.build_config))
+        #     self.run('cmake --build . --target install')
 
     def build_stage_runtime(self):
         self.output.info('stage_runtime')
@@ -994,11 +1057,6 @@ class LLVM9Conan(ConanFile):
 
         # LLVM_EXTERNAL_{CLANG,LLD,POLLY}_SOURCE_DIR:PATH
 
-        # -j flag for parallel builds
-        # don't hang all CPUs and force OS to kill build process
-        cpu_count = max(tools.cpu_count() - 2, 1)
-        self.output.info('Detected %s CPUs' % (cpu_count))
-
         llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
         self.output.info('llvm_src_dir is {}'.format(llvm_src_dir))
 
@@ -1013,7 +1071,7 @@ class LLVM9Conan(ConanFile):
         # We assume that no one need recipe with whole LLVM codebase sanitized
         # but a lot of people may want to have sanitized libc++ and libc++abi
         # https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c/blob/master/.github/msan-tester.Dockerfile
-        cmake.build(args=["--", "cxx", "cxxabi", "-j%s" % cpu_count])
+        cmake.build(args=["--", "cxx", "cxxabi", "-j%s" % self._fit_cpu_count])
         cmake.install(args=["--", "cxx", "cxxabi"])
 
         # NOTE: builds both static and shared runtime libraries
@@ -1027,7 +1085,7 @@ class LLVM9Conan(ConanFile):
         # We assume that no one need recipe with whole LLVM codebase sanitized
         # but a lot of people may want to have sanitized libc++ and libc++abi
         # https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c/blob/master/.github/msan-tester.Dockerfile
-        cmake.build(args=["--", "cxx", "cxxabi", "-j%s" % cpu_count])
+        cmake.build(args=["--", "cxx", "cxxabi", "-j%s" % self._fit_cpu_count])
         cmake.install(args=["--", "cxx", "cxxabi"])
 
         os.environ.clear()
@@ -1038,10 +1096,6 @@ class LLVM9Conan(ConanFile):
 
         if not os.path.exists(self._stage_llvm_folder):
             os.makedirs(self._stage_llvm_folder)
-
-        # don't hang all CPUs and force OS to kill build process
-        cpu_count = max(tools.cpu_count() - 2, 1)
-        self.output.info('Detected %s CPUs' % (cpu_count))
 
         # useful if you run `conan build` multiple times during development
         if os.path.exists("CMakeCache.txt"):
@@ -1071,7 +1125,7 @@ class LLVM9Conan(ConanFile):
 
         # see https://fuchsia.googlesource.com/fuchsia/+/HEAD/docs/development/build/toolchain.md
         # -j flag for parallel builds
-        cmake.build(args=["--", "-j%s" % cpu_count])
+        cmake.build(args=["--", "-j%s" % self._fit_cpu_count])
         cmake.install()
 
     def _supports_compiler(self):
@@ -1104,7 +1158,7 @@ class LLVM9Conan(ConanFile):
         # * build compiler-rt without LLVM_USE_SANITIZER,
         #   but with COMPILER_RT_BUILD_SANITIZERS="ON".
         #   Check that libclang_rt.*san*.so exists: `find . -name libclang_rt.*so*`.
-        # * build sanitized cxx cxxabi compiler-rt with LLVM_USE_SANITIZER.
+        # * build sanitized cxx cxxabi with LLVM_USE_SANITIZER.
         #   Check that libc++ sanitized: `nm lib/libc++.so.1 | grep san`.
         if not self.resolve_option("compiler-rt") and self._has_sanitizers:
           raise ConanInvalidConfiguration("sanitizers require compiler-rt")
@@ -1124,6 +1178,9 @@ class LLVM9Conan(ConanFile):
         if self._has_sanitizers and not self.options.with_libcxx:
           raise ConanInvalidConfiguration("Sanitizer requires libcxx project.")
 
+        if self._has_sanitizers and self.options.link_with_llvm_libs:
+          raise ConanInvalidConfiguration("Unable to use LLVM libs with sanitizers.")
+
         if self.settings.compiler.get_safe("cppstd"):
             tools.check_min_cppstd(self, '14')
 
@@ -1131,7 +1188,8 @@ class LLVM9Conan(ConanFile):
             raise ConanInvalidConfiguration("Need MSVC >= 19.1")
 
         if self._has_sanitizers \
-            and not self.settings.compiler in ['clang', 'apple-clang', 'clang-cl']:
+            and not 'clang' in str(self.settings.compiler):
+            # Allow only 'clang', 'apple-clang', 'clang-cl', etc.
             raise ConanInvalidConfiguration("Sanitized package is only compatible with clang")
 
         if self.options.include_what_you_use and self._has_sanitizers:
@@ -1166,10 +1224,6 @@ class LLVM9Conan(ConanFile):
         cmake = CMake(self, set_cmake_flags=True)
         cmake.verbose = True
 
-        # don't hang all CPUs and force OS to kill build process
-        cpu_count = max(tools.cpu_count() - 3, 1)
-        self.output.info('Detected %s CPUs' % (cpu_count))
-
         # https://bugs.llvm.org/show_bug.cgi?id=44074
         # cmake.definitions["EXECUTION_ENGINE_USE_LLVM_UNWINDER"]="ON"
 
@@ -1184,7 +1238,7 @@ class LLVM9Conan(ConanFile):
 
         # see Building LLVM with CMake https://llvm.org/docs/CMake.html
         cmake.definitions["LLVM_PARALLEL_COMPILE_JOBS"]=\
-          self.flag_to_cmake(os.getenv("LLVM_PARALLEL_COMPILE_JOBS", str(cpu_count)))
+          self.flag_to_cmake(os.getenv("LLVM_PARALLEL_COMPILE_JOBS", str(self._fit_cpu_count)))
 
         # Microsoft Visual C++ specific
         # Specifies the maximum number of parallel compiler jobs
@@ -1192,7 +1246,7 @@ class LLVM9Conan(ConanFile):
         # Only supported for the Visual Studio 2010 CMake generator.
         # 0 means use all processors. Default is 0.
         cmake.definitions["LLVM_COMPILER_JOBS"]=\
-          self.flag_to_cmake(os.getenv("LLVM_COMPILER_JOBS", str(cpu_count)))
+          self.flag_to_cmake(os.getenv("LLVM_COMPILER_JOBS", str(self._fit_cpu_count)))
 
         cmake.definitions["LLVM_PARALLEL_LINK_JOBS"]=\
           self.flag_to_cmake(os.getenv("LLVM_PARALLEL_LINK_JOBS", "1"))
@@ -1551,6 +1605,9 @@ class LLVM9Conan(ConanFile):
             self.copytree( \
               '{}/bin'.format(self._iwyu_folder), \
               '{}/bin'.format(self.package_folder))
+          iwyuList = glob.glob('{}/*include-what-you-use*'.format(package_bin_dir), recursive=False)
+          if len(iwyuList) <= 0:
+            raise Exception("Unable to find *include-what-you-use*")
 
     def package_stage_llvm(self):
       if not os.path.exists(self._stage_llvm_folder):
@@ -1635,7 +1692,7 @@ class LLVM9Conan(ConanFile):
       self.package_stage_llvm()
 
       # stage_runtime builds sanitized (or normal if sanitizers disabled) libs:
-      # "libcxx", "libcxxabi", "compiler-rt".
+      # "libcxx", "libcxxabi".
       self.package_stage_runtime()
 
       if self.options.include_what_you_use:
@@ -1707,10 +1764,11 @@ class LLVM9Conan(ConanFile):
         if not "clang" in llvm_projects:
             raise Exception("enable project clang")
 
-        enabled_llvm_libs = [library for library in llvm_libs \
-          if getattr(self.options, 'with_' + library)]
-        self.output.info('Enabled LLVM libs: {}'.format(', '.join(enabled_llvm_libs)))
-        self.cpp_info.libs.extend(enabled_llvm_libs)
+        if self.options.link_with_llvm_libs:
+          enabled_llvm_libs = [library for library in llvm_libs \
+            if getattr(self.options, 'with_' + library)]
+          self.output.info('Enabled LLVM libs: {}'.format(', '.join(enabled_llvm_libs)))
+          self.cpp_info.libs.extend(enabled_llvm_libs)
 
         self.output.info("LIBRARIES: %s" % self.cpp_info.libs)
         self.output.info("Package folder: %s" % self.package_folder)
@@ -1725,12 +1783,13 @@ class LLVM9Conan(ConanFile):
     # You must use same CXX ABI as LLVM libs
     # otherwise you will get link errors!
     def package_id(self):
-      if self.flag_to_cmake(os.getenv("LLVM_CONAN_FORCE_INCLUDE_SETTINGS", "ON")) == "ON":
-        self.info.include_build_settings()
-      if self.flag_to_cmake(os.getenv("LLVM_CONAN_IGNORE_ARCH_BUILD", "ON")) == "ON":
-        if self.settings.os_build == "Windows":
-            del self.info.settings.arch_build # same build is used for x86 and x86_64
-      if self.flag_to_cmake(os.getenv("LLVM_CONAN_IGNORE_ARCH", "ON")) == "ON":
-        del self.info.settings.arch
-      if self.flag_to_cmake(os.getenv("LLVM_CONAN_IGNORE_COMPILER", "ON")) == "ON":
-        del self.info.settings.compiler
+      if not self.options.link_with_llvm_libs:
+        if self.flag_to_cmake(os.getenv("LLVM_CONAN_FORCE_INCLUDE_SETTINGS", "ON")) == "ON":
+          self.info.include_build_settings()
+        if self.flag_to_cmake(os.getenv("LLVM_CONAN_IGNORE_ARCH_BUILD", "ON")) == "ON":
+          if self.settings.os_build == "Windows":
+              del self.info.settings.arch_build # same build is used for x86 and x86_64
+        if self.flag_to_cmake(os.getenv("LLVM_CONAN_IGNORE_ARCH", "ON")) == "ON":
+          del self.info.settings.arch
+        if self.flag_to_cmake(os.getenv("LLVM_CONAN_IGNORE_COMPILER", "ON")) == "ON":
+          del self.info.settings.compiler
