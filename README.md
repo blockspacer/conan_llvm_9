@@ -26,7 +26,7 @@ Features:
 
 ## Environment variables that affect recipe
 
-`llvm_9_llvm_version` default: "llvmorg-9.0.0"
+`llvm_9_llvm_version` default: "llvmorg-9.0.1"
 `llvm_9_iwyu_version` default: "clang_9.0"
 `llvm_9_BUILD_NUMBER` affects conan package version
 
@@ -57,7 +57,17 @@ Build settings: 'fPIC', 'shared', 'rtti', 'libffi', 'libz', 'lto', etc.
 
 IWYU support: "include_what_you_use"
 
-Sanitizers support: use_sanitizer
+Sanitizers support: `-o llvm_9:use_sanitizer="Address;Undefined"`
+
+You can change "Address;Undefined" to one of:
+  * "Address",
+  * "Memory",
+  * "MemoryWithOrigins",
+  * "Undefined",
+  * "Thread",
+  * "DataFlow",
+  * "Address;Undefined",
+  * "None"
 
 See `self.options` in `conanfile.py` for full list.
 
@@ -449,7 +459,18 @@ conan create . conan/stable \
   -o llvm_9:use_sanitizer="Address;Undefined"
 ```
 
-NOTE: msan requires to set `-stdlib=libc++ -lc++abi` and use include and lib paths from conan package (see above). See https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo#instrumented-gtest
+You can change "Address;Undefined" to one of:
+  * "Address",
+  * "Memory",
+  * "MemoryWithOrigins",
+  * "Undefined",
+  * "Thread",
+  * "DataFlow",
+  * "Address;Undefined",
+  * "None"
+
+NOTE: msan requires to set `-stdlib=libc++ -lc++abi` and use include and lib paths from conan package (see above).
+See https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo#instrumented-gtest
 
 Perform checks:
 
@@ -648,6 +669,80 @@ cmake -E time \
 rm -rf local_build_iwyu/package_dir
 ```
 
+## Build locally (revision with llvm libs enabled):
+
+```bash
+# https://www.pclinuxos.com/forum/index.php?topic=129566.0
+# export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
+
+export CONAN_REVISIONS_ENABLED=1
+export CONAN_VERBOSE_TRACEBACK=1
+export CONAN_PRINT_RUN_COMMANDS=1
+export CONAN_LOGGING_LEVEL=10
+export GIT_SSL_NO_VERIFY=true
+
+export CC=gcc
+export CXX=g++
+
+$CC --version
+$CXX --version
+
+# see BUGFIX (i386 instead of x86_64)
+export CXXFLAGS=-m64
+export CFLAGS=-m64
+export LDFLAGS=-m64
+
+rm -rf local_build_llvm_libs
+
+cmake -E time \
+  conan install . \
+  --install-folder local_build_llvm_libs \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang \
+    -o llvm_9:include_what_you_use=False \
+    -o llvm_9:link_with_llvm_libs=True
+
+cmake -E time \
+  conan source . \
+  --source-folder local_build_llvm_libs \
+  --install-folder local_build_llvm_libs
+
+conan build . \
+  --build-folder local_build_llvm_libs \
+  --source-folder local_build_llvm_libs \
+  --install-folder local_build_llvm_libs
+
+# remove before `conan export-pkg`
+(CONAN_REVISIONS_ENABLED=1 \
+    conan remove --force llvm_9 || true)
+
+conan package . \
+  --build-folder local_build_llvm_libs \
+  --package-folder local_build_llvm_libs/package_dir \
+  --source-folder local_build_llvm_libs \
+  --install-folder local_build_llvm_libs
+
+conan export-pkg . \
+  conan/stable \
+  --package-folder local_build_llvm_libs/package_dir \
+  --settings build_type=Release \
+  --force \
+  --profile clang \
+    -o llvm_9:include_what_you_use=False \
+    -o llvm_9:link_with_llvm_libs=True
+
+cmake -E time \
+  conan test test_package llvm_9/master@conan/stable \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang \
+    -o llvm_9:include_what_you_use=False \
+    -o llvm_9:link_with_llvm_libs=True
+
+rm -rf local_build_llvm_libs/package_dir
+```
+
 ## Build locally (revision with asan enabled):
 
 ```bash
@@ -725,6 +820,9 @@ nm -an local_build_asan/package_dir/bin/llvm-ar | grep asan
 # must be NOT sanitized
 nm -an  local_build_asan/package_dir/lib/libclangTooling.so | grep san
 
+# must be NOT sanitized
+nm -an  local_build_asan/package_dir/lib/libLLVMDemangle.so | grep san
+
 # libc++, libc++abi must be sanitized
 nm -an  local_build_asan/package_dir/lib/libc++abi.so | grep san
 
@@ -733,6 +831,16 @@ find local_build_asan/package_dir/lib/clang/ -name "*clang_rt.*san*"
 
 rm -rf local_build_asan/package_dir
 ```
+
+You can change "Address;Undefined" to one of:
+  * "Address",
+  * "Memory",
+  * "MemoryWithOrigins",
+  * "Undefined",
+  * "Thread",
+  * "DataFlow",
+  * "Address;Undefined",
+  * "None"
 
 ## FIXME: No rule to make target 'projects/libc/src/math/round.o'
 

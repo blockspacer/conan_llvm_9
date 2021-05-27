@@ -62,7 +62,7 @@ default_llvm_targets = [
 ]
 
 # used by self.cpp_info.libs
-llvm_libs = [
+llvm_core_libs = [
   'LLVMCore',
   'LLVMAnalysis',
   'LLVMSupport',
@@ -124,6 +124,36 @@ llvm_libs = [
 ]
 
 # used by self.cpp_info.libs
+clang_core_libs = [
+  'clangDynamicASTMatchers',
+  'clangCodeGen',
+  'clangFrontendTool',
+  'clang',
+  'clangEdit',
+  'clangRewriteFrontend',
+  'clangDriver',
+  'clangSema',
+  'clangASTMatchers',
+  'clangSerialization',
+  'clangBasic',
+  'clangAST',
+  'clangTooling',
+  'clangStaticAnalyzerFrontend',
+  'clangFormat',
+  'clangLex',
+  'clangFrontend',
+  'clangRewrite',
+  'clangToolingCore',
+  'clangIndex',
+  'clangAnalysis',
+  'clangParse',
+  'clangStaticAnalyzerCheckers',
+  'clangARCMigrate',
+]
+
+llvm_libs = llvm_core_libs + clang_core_libs
+
+# used by self.cpp_info.libs
 # If your project does not depend on LLVM libs (LibTooling, etc.),
 # than you can clear default_llvm_libs (just disable in options all libs)
 default_llvm_libs = llvm_libs
@@ -172,12 +202,22 @@ llvm_env = {
   #
   "LLVM_USE_NEWPM": False,
   #
+  "LLVM_USE_PERF": False,
+  #
   # build compiler-rt, libcxx etc.
   "LLVM_BUILD_RUNTIME": None,
   #
+  "LLVM_ENABLE_Z3_SOLVER": None,
+  #
+  "LLVM_ENABLE_LIBPFM": None,
+  #
+  "LLVM_ENABLE_LIBEDIT": None,
+  #
+  "LLVM_ENABLE_LIBXML2": None,
+  #
   # Build crtbegin.o/crtend.o
   # NOTE: OFF by default due to
-  # stage_runtime/lib/clang/9.0.0/lib/linux/clang_rt.crtbegin-x86_64.o
+  # stage_runtime/lib/clang/9.0.1/lib/linux/clang_rt.crtbegin-x86_64.o
   # that requires clang by clang_rt.crtbegin-x86_64.o
   "COMPILER_RT_BUILD_CRT": False,
   #
@@ -220,6 +260,18 @@ llvm_env = {
   # If disabled, do not try to build the OCaml and go bindings.
   "LLVM_ENABLE_BINDINGS": None,
   #
+  "LLVM_ENABLE_PEDANTIC": None,
+  #
+  "LLVM_ENABLE_WERROR": None,
+  #
+  "LLVM_CCACHE_BUILD": None,
+  #
+  "LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN": None,
+  #
+  "LLVM_USE_RELATIVE_PATHS_IN_DEBUG_INFO": None,
+  #
+  "LLVM_REVERSE_ITERATION": None,
+  #
   # Install symlinks from the binutils tool names
   # to the corresponding LLVM tools.
   # For example, ar will be symlinked to llvm-ar.
@@ -229,7 +281,7 @@ llvm_env = {
   #
   # LLVM target to use for native code generation.
   # This is required for JIT generation.
-  # Example: "x86_64"
+  # Examples: "x86_64", "host"
   "LLVM_TARGET_ARCH": None,
   #
   "LLVM_COMPILER_RT_DEFAULT_TARGET_TRIPLE": None,
@@ -393,7 +445,11 @@ class LLVM9Conan(ConanFile):
     llvm_version = get_branch(name, "llvm_version", "release/9.x")
     iwyu_version = get_branch(name, "iwyu_version", "clang_9.0")
 
-    description = 'The LLVM Project is a collection of modular and reusable compiler and toolchain technologies'
+    description = (
+        'A toolkit for the construction of highly optimized compilers,'
+        'optimizers, and runtime environments.'
+    )
+
     topics = ("c++", "conan", "clang", "include-what-you-use", "llvm", "iwyu", "tooling", "compiler")
     #url = "https://github.com/bincrafters/conan-folly" # TODO
     #homepage = "https://github.com/facebook/folly" # TODO
@@ -452,6 +508,18 @@ class LLVM9Conan(ConanFile):
         # Defaults to ON.
         'libz': [True, False],
         "include_what_you_use": [True, False],
+        # builddirs - Ordered list with build scripts directory paths.
+        # Defaulted to [""] (Package folder directory)
+        # CMake generators will search in these dirs for files like findXXX.cmake
+        "add_to_builddirs": [True, False],
+        # If `True` than will populate `self.cpp_info.libdirs`
+        "add_to_libdirs": [True, False],
+        # If `True` than will populate `self.cpp_info.bindirs`
+        "add_to_bindirs":  [True, False],
+        # If `True` than will populate `self.cpp_info.system_libs`
+        "add_to_system_libs":  [True, False],
+        # If `True` than will populate `self.cpp_info.includedirs`
+        "add_to_includedirs": [True, False],
         # If `True` than will add 'LLVMCore', 'LLVMAnalysis', 'LLVMSupport',
         # 'clangAST', 'clangTooling', etc. into `self.cpp_info.libs`
         "link_with_llvm_libs": [True, False]
@@ -476,6 +544,14 @@ class LLVM9Conan(ConanFile):
         'libz': True,
         'lto': 'Off',
         "include_what_you_use": True,
+        "add_to_builddirs": True,
+        "add_to_libdirs": True,
+        "add_to_bindirs": True,
+        "add_to_system_libs": True,
+        "add_to_includedirs": True,
+        # We assume that most of consumers will use recipe just to compile code,
+        # so do not link by default with 'LLVMCore', 'LLVMAnalysis',
+        # 'LLVMSupport', 'clangAST', 'clangTooling', etc.
         "link_with_llvm_libs": False
     }}
 
@@ -492,7 +568,7 @@ class LLVM9Conan(ConanFile):
 
     @property
     def _clang_ver(self):
-        return "9.0.0"
+        return "9.0.1"
 
     @property
     def _llvm_source_subfolder(self):
@@ -513,6 +589,21 @@ class LLVM9Conan(ConanFile):
     @property
     def _lower_build_type(self):
       return str(self.settings.build_type).lower()
+
+    @property
+    def _gnu_cxx11_abi(self):
+        """Checks libcxx setting and returns value for the GNU C++11 ABI flag
+        _GLIBCXX_USE_CXX11_ABI= .  Returns None if C++ library cannot be
+        determined.
+        """
+        try:
+            if str(self.settings.compiler.libcxx) == "libstdc++":
+                return "0"
+            elif str(self.settings.compiler.libcxx) == "libstdc++11":
+                return "1"
+        except:
+            pass
+        return None
 
     @property
     def _fit_cpu_count(self):
@@ -777,9 +868,9 @@ class LLVM9Conan(ConanFile):
         # cflags.append("-isystem{}/include/c++/v1".format(self._stage_tmp_compiler_folder))
         # #cflags.append("-cxx-isystem{}/include/c++/v1".format(self._stage_tmp_compiler_folder))
         # #cflags.append("-isystem{}/projects/libcxx/include".format(self._stage_tmp_compiler_folder))
-        # cflags.append("-isystem{}/lib/clang/9.0.0/include".format(self._stage_tmp_compiler_folder))
+        # cflags.append("-isystem{}/lib/clang/9.0.1/include".format(self._stage_tmp_compiler_folder))
         # cflags.append("-isystem{}/include".format(self._stage_tmp_compiler_folder))
-        # cflags.append("-resource-dir {}/lib/clang/9.0.0".format(self._stage_tmp_compiler_folder))
+        # cflags.append("-resource-dir {}/lib/clang/9.0.1".format(self._stage_tmp_compiler_folder))
         # cflags.append("-L\"{}/lib\"".format(self._stage_tmp_compiler_folder))
         # cflags.append("-Wl,-rpath,{}/lib".format(self._stage_tmp_compiler_folder))
         # # -stdlib=libc++ is a Clang (not GCC) option
@@ -825,7 +916,7 @@ class LLVM9Conan(ConanFile):
         # ldflags.append("-fuse-ld=lld")
         # #ldflags.append("-L{}/projects/libcxx/lib".format(self._stage_tmp_compiler_folder))
         # ldflags.append("-L{}/lib".format(self._stage_tmp_compiler_folder))
-        # ldflags.append("-resource-dir {}/lib/clang/9.0.0".format(self._stage_tmp_compiler_folder))
+        # ldflags.append("-resource-dir {}/lib/clang/9.0.1".format(self._stage_tmp_compiler_folder))
         # ldflags.append("-Wl,-rpath,{}/lib".format(self._stage_tmp_compiler_folder))
         # for item in ldflags:
         #   self.prepend_to_definition(cmake, "CMAKE_EXE_LINKER_FLAGS", item)
@@ -1144,6 +1235,10 @@ class LLVM9Conan(ConanFile):
             message = 'unsupported compiler: "{}", version "{}"'
             raise ConanInvalidConfiguration(message.format(compiler, version))
 
+    def config_options(self):
+        if self.settings.os_build == 'Windows':
+            del self.options.fPIC
+
     def configure(self):
         if self.options.exceptions and not self.options.rtti:
             message = 'Cannot enable exceptions without rtti support'
@@ -1206,7 +1301,7 @@ class LLVM9Conan(ConanFile):
         if self.options.include_what_you_use:
             self.run('git clone -b {} --progress --depth 100 --recursive --recurse-submodules {} {}'.format(self.iwyu_version, self.iwyu_repo_url, self._iwyu_source_subfolder))
 
-    # see https://releases.llvm.org/9.0.0/docs/CMake.html
+    # see https://releases.llvm.org/9.0.1/docs/CMake.html
     def _configure_cmake(self, llvm_enable_projects, llvm_runtimes, llvm_sanitizer="None"):
         self.output.info('configuring LLVM')
 
@@ -1596,7 +1691,7 @@ class LLVM9Conan(ConanFile):
         package_bin_dir = os.path.join(self.package_folder, "bin")
 
         if self.options.include_what_you_use:
-          iwyu_bin_dir = os.path.join(self._iwyu_source_subfolder, "build", "bin")
+          iwyu_bin_dir = os.path.join(self._iwyu_folder, "bin")
           self.output.info('copying %s into %s' % (iwyu_bin_dir, package_bin_dir))
           self.copytree( \
             iwyu_bin_dir, \
@@ -1670,21 +1765,28 @@ class LLVM9Conan(ConanFile):
       if not os.path.exists(self._stage_runtime_folder):
           raise Exception("Unable to find path: {}".format(self._stage_runtime_folder))
 
-      # keep_path=True required by `/lib/clang/x.x.x/include/`
-      #self.copy('*', src='%s/lib' % (self._stage_runtime_folder), dst='lib', keep_path=True)
-      self.copytree( \
-        '{}/lib'.format(self._stage_runtime_folder), \
-        '{}/lib'.format(self.package_folder))
-
-      if os.path.exists('{}/libexec'.format(self._stage_runtime_folder)):
-        self.copytree( \
-          '{}/libexec'.format(self._stage_runtime_folder), \
-          '{}/libexec'.format(self.package_folder))
-
       if os.path.exists('{}/include'.format(self._stage_runtime_folder)):
         self.copytree( \
           '{}/include'.format(self._stage_runtime_folder), \
           '{}/include'.format(self.package_folder))
+
+      # stage_runtime builds sanitized (or normal if sanitizers disabled) libs:
+      # "libcxx", "libcxxabi".
+      if self._has_sanitizers:
+        self.copy('*c++*', src='%s/lib' % (self._stage_runtime_folder), dst='lib', keep_path=True)
+        self.copy('*c++abi*', src='%s/lib' % (self._stage_runtime_folder), dst='lib', keep_path=True)
+        self.copy('*c++experimental*', src='%s/lib' % (self._stage_runtime_folder), dst='lib', keep_path=True)
+      else:
+        # keep_path=True required by `/lib/clang/x.x.x/include/`
+        #self.copy('*', src='%s/lib' % (self._stage_runtime_folder), dst='lib', keep_path=True)
+        self.copytree( \
+          '{}/lib'.format(self._stage_runtime_folder), \
+          '{}/lib'.format(self.package_folder))
+
+        if os.path.exists('{}/libexec'.format(self._stage_runtime_folder)):
+          self.copytree( \
+            '{}/libexec'.format(self._stage_runtime_folder), \
+            '{}/libexec'.format(self.package_folder))
 
     def package(self):
       llvm_src_dir = os.path.join(self._llvm_source_subfolder, "llvm")
@@ -1724,9 +1826,29 @@ class LLVM9Conan(ConanFile):
     # because it can conflict with system compiler
     # https://stackoverflow.com/q/54273632
     def package_info(self):
-        self.cpp_info.includedirs = ["include", "clang/include", "tools/clang/include"]
-        self.cpp_info.libdirs = ["lib", "clang/lib", "tools/clang/lib"]
-        self.cpp_info.bindirs = ["bin", "libexec", "clang", "tools", "tools/clang"]
+        # TODO: use conan components instead
+        #if self.options.add_to_builddirs:
+        #   self.env_info.PATH.append('lib/cmake')
+        #   self.env_info.PATH.append('lib/cmake/llvm')
+        #   self.env_info.PATH.append('lib/cmake/clang')
+        #   self.cpp_info.builddirs = ['lib/cmake', 'lib/cmake/llvm', 'lib/cmake/clang']
+        #
+        # TODO: use conan components instead
+        #if self.options.add_to_libdirs:
+        #   self.env_info.PATH.append('lib')
+        #   self.env_info.PATH.append('clang/lib')
+        #   self.env_info.PATH.append('tools/clang/lib')
+        #   self.cpp_info.libdirs = ["lib", "clang/lib", "tools/clang/lib"]
+        #
+        # TODO: use conan components instead
+        #if self.options.add_to_bindirs:
+        #   self.env_info.PATH.append('bin')
+        #   self.env_info.PATH.append('libexec')
+        #   self.env_info.PATH.append('clang')
+        #   self.env_info.PATH.append('tools')
+        #   self.env_info.PATH.append('tools/clang')
+        #   self.cpp_info.bindirs = ["bin", "libexec", "clang", "tools", "tools/clang"]
+
         #self.env_info.LD_LIBRARY_PATH.append(
         #    os.path.join(self.package_folder, "lib"))
         #self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
@@ -1734,43 +1856,127 @@ class LLVM9Conan(ConanFile):
         #for libpath in self.deps_cpp_info.lib_paths:
         #    self.env_info.LD_LIBRARY_PATH.append(libpath)
 
-        if self.settings.os_build == "Linux":
-            self.cpp_info.libs.extend(["pthread", "unwind", "z", "m", "dl", "ncurses", "tinfo"])
-            if self.settings.compiler == "clang" and self._libcxx == "libstdc++":
-                self.cpp_info.libs.append("atomic")
-        elif self.settings.os_build == "Windows" and self.settings.compiler == "Visual Studio":
-            self.cpp_info.libs.extend(["ws2_32", "Iphlpapi", "Crypt32"])
+        # TODO: use conan components instead
+        # if self.options.add_to_includedirs:
+        #   self.cpp_info.includedirs = ["include", "clang/include", "tools/clang/include"]
+        #   self.cpp_info.includedirs.append(os.path.join(self.package_folder, "include"))
+        #   self.cpp_info.includedirs.append(self.package_folder)
 
-        if (self.settings.os_build == "Linux" and self.settings.compiler == "clang" and
-           Version(self.settings.compiler.version.value) == "6" and self._libcxx == "libstdc++") or \
-           (self.settings.os_build == "Macos" and self.settings.compiler == "apple-clang" and
-           Version(self.settings.compiler.version.value) == "9.0" and self._libcxx == "libc++"):
-            self.cpp_info.libs.append("atomic")
-
-        self.cpp_info.includedirs.append(os.path.join(self.package_folder, "include"))
-        self.cpp_info.includedirs.append(self.package_folder)
-
-        bindir = os.path.join(self.package_folder, "bin")
-        libexec = os.path.join(self.package_folder, "libexec")
-        self.output.info("Appending PATH environment variable: {}".format(bindir))
+        #bindir = os.path.join(self.package_folder, "bin")
+        #libexec = os.path.join(self.package_folder, "libexec")
+        #self.output.info("Appending PATH environment variable: {}".format(bindir))
         #self.env_info.PATH.append(bindir)
-        self.output.info("Appending PATH environment variable: {}".format(libexec))
+        #self.output.info("Appending PATH environment variable: {}".format(libexec))
         #self.env_info.PATH.append(libexec)
 
-        libdir = os.path.join(self.package_folder, "lib")
-        self.output.info("Appending PATH environment variable: {}".format(libdir))
+        #libdir = os.path.join(self.package_folder, "lib")
+        #self.output.info("Appending PATH environment variable: {}".format(libdir))
         #self.env_info.PATH.append(libdir)
 
         if not "clang" in llvm_projects:
             raise Exception("enable project clang")
 
+        builddirs = ['lib/cmake', 'lib/cmake/llvm', 'lib/cmake/clang']
+        if not self.options.add_to_builddirs:
+          builddirs = []
+        self.cpp_info.components["builddirs"].builddirs = builddirs
+
+        libdirs = ["lib", "clang/lib", "tools/clang/lib"]
+        if not self.options.add_to_libdirs:
+          libdirs = []
+        self.cpp_info.components["libdirs"].libdirs = libdirs
+
+        includedirs = ["include", "clang/include", "tools/clang/include"]
+        includedirs.append(os.path.join(self.package_folder, "include"))
+        includedirs.append(self.package_folder)
+        if not self.options.add_to_includedirs:
+          includedirs = []
+        self.cpp_info.components["includedirs"].includedirs = includedirs
+
+        bindirs = ["bin", "libexec", "clang", "tools", "tools/clang"]
+        if not self.options.add_to_bindirs:
+          bindirs = []
+        self.cpp_info.components["bindirs"].bindirs = bindirs
+        # paths to clang-format etc.
+        self.cpp_info.components["llvm_tools"].names["cmake_find_package"] = "llvm_tools"
+        self.cpp_info.components["llvm_tools"].names["cmake_find_package_multi"] = "llvm_tools"
+        # self.cpp_info.components["llvm_tools"].builddirs = builddirs
+        # self.cpp_info.components["llvm_tools"].libdirs = libdirs
+        # self.cpp_info.components["llvm_tools"].includedirs = includedirs
+        self.cpp_info.components["llvm_tools"].bindirs = bindirs
+
+        system_libs = []
+        if self.options.add_to_system_libs:
+          if self.settings.os_build == "Linux":
+              system_libs = ['tinfo', 'pthread']
+              system_libs.extend(["unwind", "z", 'rt', 'dl', 'm', "ncurses"])
+          elif self.settings.os_build == "Windows" and self.settings.compiler == "Visual Studio":
+              system_libs.extend(["ws2_32", "Iphlpapi", "Crypt32"])
+          elif self.settings.os_build == 'Macos':
+              system_libs = ['curses', 'm']
+
+          if (self.settings.os_build == "Linux" and self.settings.compiler == "clang" and
+             Version(self.settings.compiler.version.value) == "6" and self._libcxx == "libstdc++") or \
+             (self.settings.os_build == "Macos" and self.settings.compiler == "apple-clang" and
+             Version(self.settings.compiler.version.value) == "9.0" and self._libcxx == "libc++"):
+              system_libs.append("atomic")
+
         if self.options.link_with_llvm_libs:
+          # clang libs
+          self.cpp_info.components["clang_core"].names["cmake_find_package"] = "clang_core"
+          self.cpp_info.components["clang_core"].names["cmake_find_package_multi"] = "clang_core"
+          self.cpp_info.components["clang_core"].libs = clang_core_libs
+          self.cpp_info.components["clang_core"].system_libs = system_libs
+          # self.cpp_info.components["clang_core"].builddirs = builddirs
+          # self.cpp_info.components["clang_core"].libdirs = libdirs
+          # self.cpp_info.components["clang_core"].includedirs = includedirs
+          # self.cpp_info.components["clang_core"].bindirs = bindirs
+
+          # LLVM libs
+          self.cpp_info.components["llvm_core"].names["cmake_find_package"] = "llvm_core"
+          self.cpp_info.components["llvm_core"].names["cmake_find_package_multi"] = "llvm_core"
+          self.cpp_info.components["llvm_core"].libs = llvm_core_libs
+          self.cpp_info.components["llvm_core"].system_libs = system_libs
+          # self.cpp_info.components["llvm_core"].builddirs = builddirs
+          # self.cpp_info.components["llvm_core"].libdirs = libdirs
+          # self.cpp_info.components["llvm_core"].includedirs = includedirs
+          # self.cpp_info.components["llvm_core"].bindirs = bindirs
+          #
           enabled_llvm_libs = [library for library in llvm_libs \
             if getattr(self.options, 'with_' + library)]
           self.output.info('Enabled LLVM libs: {}'.format(', '.join(enabled_llvm_libs)))
-          self.cpp_info.libs.extend(enabled_llvm_libs)
 
-        self.output.info("LIBRARIES: %s" % self.cpp_info.libs)
+          # NOTE: self.cpp_info.components cannot be used
+          # with self.cpp_info global values at the same time
+          for lib in enabled_llvm_libs:
+            self.output.info('Added component: {}'.format(lib))
+            self.cpp_info.components[lib].names["cmake_find_package"] = lib
+            self.cpp_info.components[lib].names["cmake_find_package_multi"] = lib
+            self.cpp_info.components[lib].libs.extend([lib])
+            # self.cpp_info.components[lib].bindirs = bindirs
+            # self.cpp_info.components[lib].libs = llvm_core_libs
+            self.cpp_info.components[lib].builddirs = builddirs
+            self.cpp_info.components[lib].libdirs = libdirs
+            self.cpp_info.components[lib].includedirs = includedirs
+            self.cpp_info.components[lib].system_libs = system_libs
+            #
+            # self.cpp_info.components[str(lib)].names["pkg_config"] = str(lib)
+            # self.cpp_info.components[str(lib)].build_modules.append(os.path.join("lib", str(lib)))
+            # self.cpp_info.components[str(lib)].system_libs = []
+            # self.cpp_info.components[str(lib)].defines = ["DEFINE_CRYPTO=1"]
+            # self.cpp_info.components["ssl"].includedirs = ["include/headers_ssl"]
+            # self.cpp_info.components[component].requires.append(target)
+
+        # TODO: use conan components instead
+        #if self.options.link_with_llvm_libs:
+        #  self.cpp_info.libs.extend(enabled_llvm_libs)
+        #
+        #  # TODO: we changed compiler mid-way, so detect libcxx from stage_tmp_compiler
+        #  if self._gnu_cxx11_abi:
+        #      self.cpp_info.defines.append("_GLIBCXX_USE_CXX11_ABI=%s" % self._gnu_cxx11_abi)
+        #
+        #  self.output.info("LIBRARIES: %s" % self.cpp_info.libs)
+
         self.output.info("Package folder: %s" % self.package_folder)
 
     # If your project does not depend on LLVM libs (LibTooling, etc.),
@@ -1783,6 +1989,13 @@ class LLVM9Conan(ConanFile):
     # You must use same CXX ABI as LLVM libs
     # otherwise you will get link errors!
     def package_id(self):
+      # we changed compiler mid-way
+      if self._stage_tmp_compiler_enabled:
+        self.info.settings.compiler=os.getenv("LLVM_CONAN_PACKAGE_ID_COMILER_NAME", "clang")
+        self.info.settings.compiler.version=os.getenv("LLVM_CONAN_PACKAGE_ID_COMILER_VER", "0")
+        # TODO: auto detect ABI
+        self.info.settings.compiler.libcxx=os.getenv("LLVM_CONAN_PACKAGE_ID_LIBCXX", "libstdc++11")
+
       if not self.options.link_with_llvm_libs:
         if self.flag_to_cmake(os.getenv("LLVM_CONAN_FORCE_INCLUDE_SETTINGS", "ON")) == "ON":
           self.info.include_build_settings()

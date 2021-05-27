@@ -30,6 +30,8 @@ if(NOT TARGET CONAN_PKG::llvm_9)
   message(FATAL_ERROR "Use CONAN_PKG::llvm_9 from conan")
 endif()
 
+find_library(llvm_9::llvm_tools REQUIRED)
+
 message (STATUS "CONAN_LLVM_9_ROOT=${CONAN_LLVM_9_ROOT}")
 message (STATUS "CONAN_LIB_DIRS_LLVM_9=${CONAN_LIB_DIRS_LLVM_9}")
 message (STATUS "CONAN_BUILD_DIRS_LLVM_9=${CONAN_BUILD_DIRS_LLVM_9}")

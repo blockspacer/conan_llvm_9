@@ -4,7 +4,7 @@ import os
 
 class TestPackageConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "cmake"
+    generators = "cmake", "cmake_find_package"
 
     def build(self):
         cmake = CMake(self)
@@ -16,7 +16,7 @@ class TestPackageConan(ConanFile):
 
 #    def requirements(self):
 
-        #self.requires("boost/1.71.0@conan/stable")
+#        self.requires("llvm_9::clang_core")
 #
         #self.requires("double-conversion/3.1.1@bincrafters/stable")
 #
