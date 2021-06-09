@@ -120,15 +120,15 @@ if(NOT SCAN_BUILD)
   message(FATAL_ERROR "scan-build not found")
 endif()
 
-find_program(CLANG_9 clang-9
+find_program(CLANG clang
   PATHS
     ${CONAN_BIN_DIRS}
     ${CONAN_BIN_DIRS_LLVM_9}
   NO_SYSTEM_ENVIRONMENT_PATH
   NO_CMAKE_SYSTEM_PATH
 )
-if(NOT CLANG_9)
-  message(FATAL_ERROR "clang-9 not found")
+if(NOT CLANG)
+  message(FATAL_ERROR "clang not found")
 endif()
 
 find_program(CCC_ANALYZER ccc-analyzer

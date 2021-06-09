@@ -26,9 +26,9 @@ Features:
 
 ## Environment variables that affect recipe
 
-`llvm_9_llvm_version` default: "llvmorg-9.0.1"
-`llvm_9_iwyu_version` default: "clang_9.0"
-`llvm_9_BUILD_NUMBER` affects conan package version
+`llvm_9_llvm_version`. default: "llvmorg-9.0.1"
+`llvm_9_iwyu_version`. default: "clang_9.0"
+`llvm_9_BUILD_NUMBER` affects conan package version. default: "" (version will be "master")
 
 A lot of LLVM options can be modified by environment variables.
 `LLVM_COMPILER_JOBS` - affects cmake definition `LLVM_COMPILER_JOBS`
@@ -151,15 +151,15 @@ if(NOT SCAN_BUILD)
   message(FATAL_ERROR "scan-build not found")
 endif()
 
-find_program(CLANG_9 clang-9
+find_program(CLANG clang
   PATHS
     ${CONAN_BIN_DIRS}
     ${CONAN_BIN_DIRS_LLVM_9}
   NO_SYSTEM_ENVIRONMENT_PATH
   NO_CMAKE_SYSTEM_PATH
 )
-if(NOT CLANG_9)
-  message(FATAL_ERROR "clang-9 not found")
+if(NOT CLANG)
+  message(FATAL_ERROR "clang not found")
 endif()
 
 find_program(CCC_ANALYZER ccc-analyzer
@@ -355,6 +355,8 @@ sudo apt-get install libncurses5-dev libncursesw5-dev libtinfo-dev
 
 # Tested with clang 10 and gcc 7
 sudo apt-get -y install clang-10 g++-7 gcc-7
+
+sudo apt-get install -y libunwind-dev
 
 # llvm-config binary that coresponds to the same clang you are using to compile
 export LLVM_CONFIG=/usr/bin/llvm-config-10
@@ -841,6 +843,87 @@ You can change "Address;Undefined" to one of:
   * "DataFlow",
   * "Address;Undefined",
   * "None"
+
+## Build other llvm branch:
+
+```bash
+# https://www.pclinuxos.com/forum/index.php?topic=129566.0
+# export LDFLAGS="$LDFLAGS -ltinfo -lncurses"
+
+export CONAN_REVISIONS_ENABLED=1
+export CONAN_VERBOSE_TRACEBACK=1
+export CONAN_PRINT_RUN_COMMANDS=1
+export CONAN_LOGGING_LEVEL=10
+export GIT_SSL_NO_VERIFY=true
+
+export CC=gcc
+export CXX=g++
+
+$CC --version
+$CXX --version
+
+# see BUGFIX (i386 instead of x86_64)
+export CXXFLAGS=-m64
+export CFLAGS=-m64
+export LDFLAGS=-m64
+
+export llvm_9_llvm_version="release/12.x"
+export llvm_9_iwyu_version="clang_12"
+export llvm_9_BUILD_NUMBER="-clang_12"
+export CONAN_LLVM_SKIP_PATCH=True
+
+export LLVM_CONAN_PACKAGE_ID_COMILER_VER="12"
+export LLVM_CONAN_CLANG_VER="12.0.1"
+
+rm -rf local_build_iwyu_clang_12
+
+cmake -E time \
+  conan install . \
+  --install-folder local_build_iwyu_clang_12 \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang \
+    -o llvm_9:include_what_you_use=True
+
+cmake -E time \
+  conan source . \
+  --source-folder local_build_iwyu_clang_12 \
+  --install-folder local_build_iwyu_clang_12
+
+conan build . \
+  --build-folder local_build_iwyu_clang_12 \
+  --source-folder local_build_iwyu_clang_12 \
+  --install-folder local_build_iwyu_clang_12
+
+# remove before `conan export-pkg`
+(CONAN_REVISIONS_ENABLED=1 \
+    conan remove --force llvm_9 || true)
+
+conan package . \
+  --build-folder local_build_iwyu_clang_12 \
+  --package-folder local_build_iwyu_clang_12/package_dir \
+  --source-folder local_build_iwyu_clang_12 \
+  --install-folder local_build_iwyu_clang_12
+
+conan export-pkg . \
+  conan/stable \
+  --package-folder local_build_iwyu_clang_12/package_dir \
+  --settings build_type=Release \
+  --force \
+  --profile clang \
+    -o llvm_9:include_what_you_use=True
+
+cmake -E time \
+  conan test test_package llvm_9/master$llvm_9_BUILD_NUMBER@conan/stable \
+  -s build_type=Release \
+  -s llvm_9:build_type=Release \
+  --profile clang \
+      -o llvm_9:include_what_you_use=True
+
+rm -rf local_build_iwyu_clang_12/package_dir
+```
+
+Now you can depend on conan package `llvm_9/master$llvm_9_BUILD_NUMBER@conan/stable`
 
 ## FIXME: No rule to make target 'projects/libc/src/math/round.o'
 

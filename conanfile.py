@@ -413,7 +413,7 @@ def get_version(name, version):
 
 def get_branch(name, env_name, branch):
     envvar = os.getenv("{}_{}".format(name, env_name))
-    return (branch + envvar) if envvar else branch
+    return (envvar) if envvar else branch
 
 # stage_tmp_compiler - build compiler with static link to re-build other code, without install step
 # (optional) build IWYU, before LLVM_USE_SANITIZER enabled
@@ -568,7 +568,7 @@ class LLVM9Conan(ConanFile):
 
     @property
     def _clang_ver(self):
-        return "9.0.1"
+        return os.getenv("LLVM_CONAN_CLANG_VER", "9.0.1")
 
     @property
     def _llvm_source_subfolder(self):
@@ -654,7 +654,9 @@ class LLVM9Conan(ConanFile):
         + (" " + cmake.definitions[name] if name in cmake.definitions else "")
 
     def project_allowed_on_stage_tmp_compiler(self, project):
-      return True;
+      arr = ['all', 'libc', 'debuginfo-tests', 'mlir', 'openmp', \
+             'parallel-libs', 'polly', 'pstl']
+      return project not in arr
 
     def runtime_allowed_on_stage_tmp_compiler(self, project):
       return False
@@ -675,7 +677,7 @@ class LLVM9Conan(ConanFile):
         # than we will be able to build runtimes.
         # We will build runtimes separately if sanitizer enabled.
         return project not in ["libcxx", "libcxxabi"]
-      return True;
+      return True
 
     def runtime_allowed_on_stage_llvm(self, project):
       return False
@@ -1311,10 +1313,11 @@ class LLVM9Conan(ConanFile):
         compiler_rt_src_dir = os.path.join(self._llvm_source_subfolder, "compiler-rt")
         self.output.info('compiler_rt_src_dir is {}'.format(compiler_rt_src_dir))
 
-        for patch in os.listdir(os.path.join(self.source_folder, "patches")):
-            patchpath = os.path.join(self.source_folder, "patches", patch)
-            self.output.info('patch is {}'.format(patchpath))
-            tools.patch(base_path=compiler_rt_src_dir, patch_file=patchpath)
+        if not os.getenv("CONAN_LLVM_SKIP_PATCH"):
+          for patch in os.listdir(os.path.join(self.source_folder, "patches")):
+              patchpath = os.path.join(self.source_folder, "patches", patch)
+              self.output.info('patch is {}'.format(patchpath))
+              tools.patch(base_path=compiler_rt_src_dir, patch_file=patchpath)
 
         cmake = CMake(self, set_cmake_flags=True)
         cmake.verbose = True
@@ -1992,7 +1995,7 @@ class LLVM9Conan(ConanFile):
       # we changed compiler mid-way
       if self._stage_tmp_compiler_enabled:
         self.info.settings.compiler=os.getenv("LLVM_CONAN_PACKAGE_ID_COMILER_NAME", "clang")
-        self.info.settings.compiler.version=os.getenv("LLVM_CONAN_PACKAGE_ID_COMILER_VER", "0")
+        self.info.settings.compiler.version=os.getenv("LLVM_CONAN_PACKAGE_ID_COMILER_VER", "9")
         # TODO: auto detect ABI
         self.info.settings.compiler.libcxx=os.getenv("LLVM_CONAN_PACKAGE_ID_LIBCXX", "libstdc++11")
 
