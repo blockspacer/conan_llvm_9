@@ -1,3 +1,6 @@
+/conan_auto_install
+/cmake_utils
+
 # Compiled Object files
 *.slo
 *.lo
