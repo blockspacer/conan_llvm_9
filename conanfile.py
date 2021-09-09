@@ -401,6 +401,10 @@ llvm_env = {
   "LLVM_STATIC_LINK_CXX_STDLIB": None,
 }
 
+def get_name(default):
+    envvar = os.getenv("LLVM_PACKAGE_NAME", default)
+    return envvar
+
 # Users locally they get the 1.0.0 version,
 # without defining any env-var at all,
 # and CI servers will append the build number.
@@ -438,7 +442,7 @@ def get_branch(name, env_name, branch):
 # see https://github.com/llvm-mirror/compiler-rt/blob/master/lib/sanitizer_common/symbolizer/scripts/build_symbolizer.sh
 #
 class LLVM9Conan(ConanFile):
-    name = "llvm_9"
+    name = get_name("llvm_9")
 
     version = get_version(name, "master")
 

@@ -1,6 +1,9 @@
 from conans import ConanFile, CMake
 import os
 
+def get_name(default):
+    envvar = os.getenv("LLVM_PACKAGE_NAME", default)
+    return envvar
 
 class TestPackageConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
@@ -11,6 +14,7 @@ class TestPackageConan(ConanFile):
         cmake.definitions["CONAN_DISABLE_CHECK_COMPILER"] = "ON"
         cmake.definitions["CMAKE_C_COMPILER_FORCED"] = "TRUE"
         cmake.definitions["CMAKE_CXX_COMPILER_FORCED"] = "TRUE"
+        cmake.definitions["LLVM_PACKAGE_NAME"] = get_name("llvm_9")
         cmake.configure()
         cmake.build()
 

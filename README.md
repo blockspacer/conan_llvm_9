@@ -404,7 +404,6 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 export CC=gcc
 export CXX=g++
@@ -441,7 +440,6 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 export CC=gcc
 export CXX=g++
@@ -542,7 +540,6 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 export CC=gcc
 export CXX=g++
@@ -610,7 +607,6 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 export CC=gcc
 export CXX=g++
@@ -681,7 +677,6 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 export CC=gcc
 export CXX=g++
@@ -755,7 +750,6 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 export CC=gcc
 export CXX=g++
@@ -854,7 +848,6 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 export CC=gcc
 export CXX=g++
@@ -867,10 +860,14 @@ export CXXFLAGS=-m64
 export CFLAGS=-m64
 export LDFLAGS=-m64
 
-export llvm_9_llvm_version="release/12.x"
-export llvm_9_iwyu_version="clang_12"
-export llvm_9_BUILD_NUMBER="-clang_12"
+export LLVM_PACKAGE_NAME="llvm_12"
+
+export $LLVM_PACKAGE_NAME\_llvm_version="release/12.x"
+export $LLVM_PACKAGE_NAME\_iwyu_version="clang_12"
+export $LLVM_PACKAGE_NAME\_BUILD_NUMBER="-clang_12"
 export CONAN_LLVM_SKIP_PATCH=True
+
+export BUILD_NUMBER="-clang_12"
 
 export LLVM_CONAN_PACKAGE_ID_COMILER_VER="12"
 export LLVM_CONAN_CLANG_VER="12.0.1"
@@ -881,9 +878,9 @@ cmake -E time \
   conan install . \
   --install-folder local_build_iwyu_clang_12 \
   -s build_type=Release \
-  -s llvm_9:build_type=Release \
+  -s $LLVM_PACKAGE_NAME:build_type=Release \
   --profile clang \
-    -o llvm_9:include_what_you_use=True
+    -o $LLVM_PACKAGE_NAME:include_what_you_use=True
 
 cmake -E time \
   conan source . \
@@ -897,7 +894,7 @@ conan build . \
 
 # remove before `conan export-pkg`
 (CONAN_REVISIONS_ENABLED=1 \
-    conan remove --force llvm_9 || true)
+    conan remove --force $LLVM_PACKAGE_NAME || true)
 
 conan package . \
   --build-folder local_build_iwyu_clang_12 \
@@ -911,19 +908,19 @@ conan export-pkg . \
   --settings build_type=Release \
   --force \
   --profile clang \
-    -o llvm_9:include_what_you_use=True
+    -o $LLVM_PACKAGE_NAME:include_what_you_use=True
 
 cmake -E time \
-  conan test test_package llvm_9/master$llvm_9_BUILD_NUMBER@conan/stable \
+  conan test test_package $LLVM_PACKAGE_NAME/master$BUILD_NUMBER@conan/stable \
   -s build_type=Release \
-  -s llvm_9:build_type=Release \
+  -s $LLVM_PACKAGE_NAME:build_type=Release \
   --profile clang \
-      -o llvm_9:include_what_you_use=True
+      -o $LLVM_PACKAGE_NAME:include_what_you_use=True
 
 rm -rf local_build_iwyu_clang_12/package_dir
 ```
 
-Now you can depend on conan package `llvm_9/master$llvm_9_BUILD_NUMBER@conan/stable`
+Now you can depend on conan package `$LLVM_PACKAGE_NAME/master$BUILD_NUMBER@conan/stable`
 
 ## FIXME: No rule to make target 'projects/libc/src/math/round.o'
 
