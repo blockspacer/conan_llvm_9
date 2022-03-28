@@ -1530,8 +1530,7 @@ class LLVM9Conan(ConanFile):
         # COMPILER_RT_HWASAN_WITH_INTERCEPTORS
         # COMPILER_RT_OS_DIR
 
-        # TODO: make customizable
-        #cmake.definitions["CMAKE_CXX_STANDARD"]="17"
+        #cmake.definitions["CMAKE_CXX_STANDARD"]="17" # use compiler.cppstd
 
         cmake.definitions["BUILD_SHARED_LIBS"]="ON" if self.options.shared else "OFF"
 
